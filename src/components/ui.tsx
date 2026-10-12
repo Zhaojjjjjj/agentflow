@@ -281,29 +281,51 @@ const STEP_DOT: Record<string, string> = {
 
 export function RunTimeline({ steps }: { steps: StepRow[] }) {
   if (steps.length === 0)
-    return <p className="text-sm text-slate-400">暂无节点执行记录</p>;
+    return (
+      <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 px-4 py-8 text-center">
+        <p className="text-sm text-slate-400">暂无节点执行记录</p>
+      </div>
+    );
   return (
     <ol className="relative space-y-3 border-l-2 border-slate-100 pl-6">
       {steps.map((s) => (
         <li key={s.id} className="relative">
           <span
-            className="absolute -left-[31px] top-4 h-3 w-3 rounded-full border-2 border-white"
+            className="absolute -left-[31px] top-5 h-3 w-3 rounded-full border-2 border-white shadow-[0_0_0_3px_rgba(15,23,42,0.04)]"
             style={{ background: STEP_DOT[s.status] || "#CBD5E1" }}
           />
-          <div className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-sm">
-            <div className="mb-1.5 flex flex-wrap items-center gap-2">
-              <span className="text-sm font-medium text-slate-900">{s.node_name || s.node_type}</span>
-              <span className="font-mono text-[11px] text-slate-400">{s.node_id}</span>
+          <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.05)] transition-all duration-150 hover:border-slate-300 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)]">
+            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
+              <span className="text-sm font-semibold tracking-tight text-slate-900">
+                {s.node_name || s.node_type}
+              </span>
               <StatusBadge status={s.status} />
+              <span className="ml-auto font-mono text-[11px] text-slate-300">{s.node_id}</span>
             </div>
-            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-400">
-              {s.duration_ms != null && <span>耗时 {(s.duration_ms / 1000).toFixed(1)}s</span>}
-              {s.tokens > 0 && <span>{s.tokens} tokens</span>}
-              {Number(s.cost_usd) > 0 && <span>${Number(s.cost_usd).toFixed(5)}</span>}
-              {s.started_at && <span>{new Date(s.started_at).toLocaleTimeString()}</span>}
+            <div className="mt-2.5 flex flex-wrap gap-1.5">
+              {s.duration_ms != null && (
+                <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500">
+                  耗时 {(s.duration_ms / 1000).toFixed(1)}s
+                </span>
+              )}
+              {s.tokens > 0 && (
+                <span className="inline-flex items-center rounded-md bg-brand-50 px-2 py-0.5 text-[11px] font-medium text-brand-700">
+                  {s.tokens.toLocaleString()} tokens
+                </span>
+              )}
+              {Number(s.cost_usd) > 0 && (
+                <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500">
+                  ${Number(s.cost_usd).toFixed(5)}
+                </span>
+              )}
+              {s.started_at && (
+                <span className="inline-flex items-center px-1 py-0.5 text-[11px] text-slate-400">
+                  {new Date(s.started_at).toLocaleTimeString()}
+                </span>
+              )}
             </div>
             {s.error && (
-              <p className="mt-2 rounded-lg bg-red-50 p-2.5 font-mono text-xs leading-5 text-red-600">
+              <p className="mt-2.5 rounded-xl bg-red-50/80 p-3 font-mono text-xs leading-5 text-red-600">
                 {s.error}
               </p>
             )}

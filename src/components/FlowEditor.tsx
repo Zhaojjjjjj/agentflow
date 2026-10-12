@@ -7,6 +7,7 @@ import {
   ReactFlow,
   ReactFlowProvider,
   Background,
+  BackgroundVariant,
   Controls,
   MiniMap,
   useReactFlow,
@@ -313,7 +314,7 @@ function EditorInner({ workflowId }: { workflowId: string }) {
             fitView
             proOptions={{ hideAttribution: true }}
           >
-            <Background color="#e9ebf1" gap={24} />
+            <Background variant={BackgroundVariant.Dots} gap={22} size={1.1} color="#dde2ec" />
             <Controls
               style={{
                 borderRadius: 8,
@@ -325,6 +326,10 @@ function EditorInner({ workflowId }: { workflowId: string }) {
             <MiniMap
               pannable
               zoomable
+              nodeColor={(n) => {
+                const t = (n.data as { nodeType?: string } | undefined)?.nodeType;
+                return (t && NODE_META[t as NodeType]?.color) || "#cbd5e1";
+              }}
               style={{
                 backgroundColor: "#ffffff",
                 borderRadius: 8,

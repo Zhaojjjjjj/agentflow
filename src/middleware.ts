@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 import { SESSION_COOKIE, verifySession } from "@/lib/auth";
 
 // ---- 拦截规则 ----
-// 页面：控制台全部页面
+// 页面：控制台页面（`/` 为公开落地页，不拦截）
 const PAGE_PREFIXES = ["/workflows", "/runs", "/api-keys", "/settings"];
 // 内部 API：控制台调用的全部数据接口
 const API_PREFIXES = [
@@ -18,7 +18,6 @@ const API_PREFIXES = [
 // /api/inngest 靠 INNGEST_SIGNING_KEY 自有验签；/api/public/* 走 API Key 自有鉴权。
 
 function isConsolePage(pathname: string): boolean {
-  if (pathname === "/") return true;
   return PAGE_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"));
 }
 
@@ -46,7 +45,6 @@ export async function middleware(req: NextRequest) {
 
 export const config = {
   matcher: [
-    "/",
     "/workflows/:path*",
     "/runs/:path*",
     "/api-keys/:path*",
