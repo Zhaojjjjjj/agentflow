@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/ui";
+import LogoutButton from "@/components/LogoutButton";
 
 interface Workflow {
   id: string;
@@ -58,7 +59,7 @@ export default function Dashboard() {
       <PageHeader
         title="agentflow"
         desc="可视化 AI Agent 工作流编排与执行平台"
-        actions={<><a className="btn-secondary" href="/settings">LLM 设置</a><a className="btn-secondary" href="/api-keys">API Keys</a></>}
+        actions={<><a className="btn-secondary" href="/settings">LLM 设置</a><a className="btn-secondary" href="/api-keys">API Keys</a><LogoutButton /></>}
       />
 
       {health && (

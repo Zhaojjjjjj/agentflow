@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/ui";
+import LogoutButton from "@/components/LogoutButton";
 
 interface KeyRow {
   id: string;
@@ -66,7 +67,7 @@ export default function ApiKeysPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-6 py-8">
-      <PageHeader title="API Keys" desc="用于 POST /api/public/workflows/[id]/run 的鉴权" actions={<a className="btn-secondary" href="/">返回首页</a>} />
+      <PageHeader title="API Keys" desc="用于 POST /api/public/workflows/[id]/run 的鉴权" actions={<><a className="btn-secondary" href="/">返回首页</a><LogoutButton /></>} />
 
       {newKey && (
         <div className="card mb-5 border-amber-300 bg-amber-50 p-4">

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/ui";
+import LogoutButton from "@/components/LogoutButton";
 import Modal from "@/components/Modal";
 
 interface Provider {
@@ -275,6 +276,7 @@ export default function SettingsPage() {
               </button>
             )}
             <a className="btn-secondary" href="/">返回首页</a>
+            <LogoutButton />
           </>
         }
       />
