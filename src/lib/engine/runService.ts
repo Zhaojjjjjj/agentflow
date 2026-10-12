@@ -6,6 +6,8 @@ import { makeSyncRunner } from "./runners";
 import { SupabaseTraceWriter } from "./trace";
 import type { WorkflowDefinition } from "./types";
 import { findCycle } from "./types";
+import { configuredProviders } from "../llm/providers";
+import { getEmbeddingConfig } from "../llm/embeddings";
 
 export type RunMode = "async" | "sync";
 
@@ -31,6 +33,23 @@ export async function createRun(opts: {
   const cycle = findCycle(definition);
   if (cycle) {
     throw new Error(`工作流存在循环依赖，无法执行：${cycle.join(" → ")}`);
+  }
+
+  // Pre-flight: fail fast with a clear message when required model providers are missing,
+  // instead of letting the run die mid-execution with a cryptic error.
+  const nodeTypes = new Set(definition.nodes.map((n) => n.type));
+  if (nodeTypes.has("llm")) {
+    const providers = await configuredProviders().catch(() => [] as string[]);
+    if (providers.length === 0) {
+      throw new Error("未配置 LLM 供应商：请先到「设置 / LLM 供应商」中添加，或配置 LLM_PROVIDER_* 环境变量");
+    }
+  }
+  if (nodeTypes.has("rag-retrieve")) {
+    try {
+      await getEmbeddingConfig();
+    } catch {
+      throw new Error("未配置 Embedding 模型：请先到「设置 / LLM 供应商」中添加 embedding 供应商，或配置 LLM_EMBEDDING_* 环境变量");
+    }
   }
 
   const { data: run, error: rerr } = await sb
