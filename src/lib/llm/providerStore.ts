@@ -94,7 +94,7 @@ export async function createProvider(input: ProviderInput): Promise<ProviderPubl
     base_url: input.baseUrl.trim().replace(/\/$/, ""),
     api_key_encrypted: encryptSecret(input.apiKey!.trim()), // throws when APP_ENCRYPTION_KEY missing
     model: input.model.trim(),
-    dimensions: input.kind === "embedding" ? Number(input.dimensions) || 1536 : null,
+    dimensions: input.kind === "embedding" ? Number(input.dimensions) || 1024 : null,
     priority: Number.isFinite(Number(input.priority)) ? Number(input.priority) : 0,
     enabled: input.enabled !== false,
   };

@@ -14,8 +14,8 @@ export interface EmbeddingConfig {
 }
 
 function envDimensions(): number {
-  const n = Number(process.env.LLM_EMBEDDING_DIMENSIONS || "1536");
-  return Number.isFinite(n) && n > 0 ? n : 1536;
+  const n = Number(process.env.LLM_EMBEDDING_DIMENSIONS || "1024");
+  return Number.isFinite(n) && n > 0 ? n : 1024;
 }
 
 function readEmbeddingFromEnv(): EmbeddingConfig | null {
@@ -56,7 +56,7 @@ async function readEmbeddingFromDb(): Promise<EmbeddingConfig | null> {
       baseURL: (row.base_url || "").replace(/\/$/, ""),
       apiKey: decryptSecret(row.api_key_encrypted),
       model: row.model,
-      dimensions: Number.isFinite(dimensions) && dimensions > 0 ? dimensions : 1536,
+      dimensions: Number.isFinite(dimensions) && dimensions > 0 ? dimensions : 1024,
     };
   } catch (e) {
     console.warn(`[agentflow] embedding provider read failed, using env config: ${(e as Error).message}`);

@@ -74,7 +74,7 @@ openssl rand -hex 32
 | `ADMIN_USERNAME` / `ADMIN_PASSWORD` | 控制台登录账号；用户名默认 `admin01`，密码必填 |
 | `AUTH_SECRET` | 会话签名密钥；不填则回退到 `APP_ENCRYPTION_KEY` |
 | `LLM_PROVIDER_1_*` | 主 LLM（OpenAI 兼容：baseURL/key/model），可配多个按顺序降级；也可在后台配置后留空 |
-| `LLM_EMBEDDING_*` | RAG 向量化（baseURL/key/model/dimensions，需与表结构一致，默认 1536）；也可在后台配置后留空 |
+| `LLM_EMBEDDING_*` | RAG 向量化（baseURL/key/model/dimensions，需与表结构一致，默认 1024）；也可在后台配置后留空 |
 | `NEXT_PUBLIC_APP_URL` | 部署后的公网地址 |
 
 ### 3.5 后台配置 LLM（推荐，不用改环境变量）
@@ -89,7 +89,7 @@ openssl rand -hex 32
 
 解析顺序：**数据库优先**（`enabled=true`，按 `priority` 排序），数据库为空或迁移未执行时自动回退到环境变量——执行器无感切换。
 
-> 注意：向量供应商的 `dimensions` 须与 `documents.embedding` 的向量维度一致（默认 1536），否则入库会失败。
+> 注意：向量供应商的 `dimensions` 须与 `documents.embedding` 的向量维度一致（默认 1024），否则入库会失败。
 
 ### 3.6 控制台登录（单管理员账号）
 

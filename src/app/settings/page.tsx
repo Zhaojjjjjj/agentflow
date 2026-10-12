@@ -47,7 +47,7 @@ const emptyForm = (kind: "chat" | "embedding"): FormState => ({
   baseUrl: "",
   apiKey: "",
   model: "",
-  dimensions: "1536",
+  dimensions: "1024",
   priority: "0",
   enabled: true,
 });
@@ -100,7 +100,7 @@ export default function SettingsPage() {
       baseUrl: p.base_url,
       apiKey: "",
       model: p.model,
-      dimensions: String(p.dimensions ?? 1536),
+      dimensions: String(p.dimensions ?? 1024),
       priority: String(p.priority),
       enabled: p.enabled,
     });
@@ -131,7 +131,7 @@ export default function SettingsPage() {
         baseUrl: form.baseUrl.trim(),
         apiKey: form.apiKey,
         model: form.model.trim(),
-        dimensions: form.kind === "embedding" ? Number(form.dimensions) || 1536 : null,
+        dimensions: form.kind === "embedding" ? Number(form.dimensions) || 1024 : null,
         priority: Number(form.priority) || 0,
         enabled: form.enabled,
       };
@@ -266,7 +266,7 @@ export default function SettingsPage() {
                     </div>
                     <div className="mt-1 truncate font-mono text-xs text-slate-400">
                       {p.base_url} · Key {p.key_mask} · 优先级 {p.priority}
-                      {p.kind === "embedding" && ` · 维度 ${p.dimensions ?? 1536}`}
+                      {p.kind === "embedding" && ` · 维度 ${p.dimensions ?? 1024}`}
                     </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-1.5">
@@ -390,18 +390,18 @@ export default function SettingsPage() {
                 <Input
                   value={form.dimensions}
                   onChange={(e) => setForm({ ...form, dimensions: e.target.value })}
-                  placeholder="1536"
+                  placeholder="1024"
                 />
               </Field>
               <div className="col-span-2 rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-3 text-[13px] leading-6 text-amber-800">
-                <p className="font-medium">关于维度：必须填 1536</p>
+                <p className="font-medium">关于维度：必须填 1024</p>
                 <p className="mt-1">
                   数据库 <span className="font-mono">documents.embedding</span> 列是{" "}
-                  <span className="font-mono">vector(1536)</span>（见{" "}
+                  <span className="font-mono">vector(1024)</span>（见{" "}
                   <span className="font-mono">supabase/schema.sql</span>，建表时写死），
                   此处填其他值会导致向量写入失败。推荐{" "}
-                  <span className="font-mono">text-embedding-3-small</span>（1536
-                  维）或任意 OpenAI 兼容的 embeddings 接口。
+                  <span className="font-mono">BAAI/bge-large-zh-v1.5</span>（1024
+                  维，中文效果好）或任意 OpenAI 兼容的 embeddings 接口。
                 </p>
               </div>
             </>

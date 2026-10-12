@@ -96,7 +96,7 @@ export default function KnowledgeBase({
           <div className="mb-3 flex items-start justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
             <p className="text-[13px] leading-6 text-amber-800">
               尚未配置向量供应商（embedding），文档无法向量化、检索也不可用。请先添加一个 embedding
-              供应商（维度须为 1536）。
+              供应商（维度须为 1024）。
             </p>
             <a
               href="/settings"

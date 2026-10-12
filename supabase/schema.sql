@@ -88,11 +88,11 @@ create table if not exists documents (
   workflow_id uuid references workflows(id) on delete cascade,
   content text not null,
   metadata jsonb not null default '{}',
-  embedding vector(1536),
+  embedding vector(1024),
   created_at timestamptz not null default now()
 );
 create index if not exists idx_documents_workflow on documents (workflow_id);
--- NOTE: if you use an embedding model with dimensions != 1536,
+-- NOTE: if you use an embedding model with dimensions != 1024,
 -- change the vector size above and recreate this index.
 create index if not exists idx_documents_embedding
   on documents using ivfflat (embedding vector_cosine_ops)
@@ -100,7 +100,7 @@ create index if not exists idx_documents_embedding
 
 -- Cosine-similarity search over a workflow's documents
 create or replace function match_documents(
-  query_embedding vector(1536),
+  query_embedding vector(1024),
   match_count int,
   filter_workflow_id uuid,
   min_similarity float default 0

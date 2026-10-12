@@ -13,7 +13,7 @@ create table if not exists llm_providers (
   base_url text not null,
   api_key_encrypted text not null,
   model text not null,
-  dimensions int,                       -- 仅 embedding 用（须与 documents.embedding 的向量维度一致，默认 1536）
+  dimensions int,                       -- 仅 embedding 用（须与 documents.embedding 的向量维度一致，默认 1024）
   priority int not null default 0,      -- 同 kind 内按 priority 升序试错
   enabled boolean not null default true,
   created_at timestamptz not null default now(),
