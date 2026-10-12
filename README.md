@@ -2,7 +2,7 @@
 
 拖拽编排 AI Agent 工作流：LLM 调用、HTTP 工具、条件分支、循环、RAG 检索、人工审批，一键运行并可发布为 HTTP API。
 
-全免费架构：**Next.js 15 全栈**（Vercel 部署）+ **Supabase Postgres/pgvector**（数据库）+ **Upstash Redis**（可选）+ **Inngest**（durable 执行引擎）。
+Serverless 架构：**Next.js 15 全栈**（Vercel 部署）+ **Supabase Postgres/pgvector**（数据库）+ **Upstash Redis**（可选）+ **Inngest**（durable 执行引擎）。
 
 ## 架构
 
@@ -42,15 +42,15 @@
 按 DAG 拓扑逐节点 `step.run` 执行 → 每节点写 `run_steps` trace → SSE 推送进度 →
 人工审批节点 `waitForEvent` 暂停 → 批准/拒绝后继续。
 
-## 从零搭建（全部免费）
+## 从零搭建
 
-### 1. 注册免费服务
+### 1. 注册所需服务
 
-| 服务 | 用途 | 免费额度 |
+| 服务 | 用途 | 备注 |
 |---|---|---|
-| [Supabase](https://supabase.com) | Postgres + pgvector | 500MB 数据库 |
-| [Upstash](https://upstash.com) | Redis（可选） | 10k 命令/天 |
-| [Inngest](https://inngest.com) | durable 执行 | 每月一定量 steps |
+| [Supabase](https://supabase.com) | Postgres + pgvector | 数据库与向量检索 |
+| [Upstash](https://upstash.com) | Redis（可选） | 未配置时自动降级 |
+| [Inngest](https://inngest.com) | durable 执行 | 异步执行 / 定时 / 人工审批必需 |
 
 ### 2. 建表
 

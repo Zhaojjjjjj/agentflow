@@ -24,6 +24,8 @@ export default function KnowledgeBase({
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  // null = 检测中，true = 已配置向量供应商，false = 未配置
+  const [embOk, setEmbOk] = useState<boolean | null>(null);
 
   const load = async () => {
     const res = await fetch(`/api/documents?workflowId=${workflowId}`);
@@ -73,7 +75,16 @@ export default function KnowledgeBase({
   useEffect(() => {
     if (open) {
       setDocs([]);
+      setEmbOk(null);
       load().catch(() => undefined);
+      // 检测是否配置了向量供应商（embedding），未配置则显示引导横幅
+      fetch("/api/settings/providers")
+        .then((r) => r.json())
+        .then((j) => {
+          const list = Array.isArray(j.providers) ? j.providers : [];
+          setEmbOk(list.some((p: { kind: string; enabled: boolean }) => p.kind === "embedding" && p.enabled));
+        })
+        .catch(() => setEmbOk(true)); // 接口异常时不误报
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -81,6 +92,20 @@ export default function KnowledgeBase({
   return (
     <>
       <Modal open={open} onClose={onClose} title="知识库（RAG）" wide>
+        {embOk === false && (
+          <div className="mb-3 flex items-start justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+            <p className="text-[13px] leading-6 text-amber-800">
+              尚未配置向量供应商（embedding），文档无法向量化、检索也不可用。请先添加一个 embedding
+              供应商（维度须为 1536）。
+            </p>
+            <a
+              href="/settings"
+              className="shrink-0 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-amber-700"
+            >
+              去设置
+            </a>
+          </div>
+        )}
         <p className="mb-3 text-xs leading-5 text-slate-500">
           粘贴文本（空行分隔为多个 chunk），将自动向量化存入 pgvector，供 rag-retrieve 节点检索。
         </p>

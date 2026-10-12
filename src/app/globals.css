@@ -57,3 +57,50 @@
 .react-flow__node.selectable:focus {
   outline: none;
 }
+
+/* 落地页节点 marquee */
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.marquee-track {
+  animation: marquee 36s linear infinite;
+}
+.marquee:hover .marquee-track {
+  animation-play-state: paused;
+}
+
+/* SVG 工作流演示：边线虚线流动 */
+@keyframes dash-flow {
+  to { stroke-dashoffset: -28; }
+}
+.edge-flow {
+  stroke-dasharray: 7 7;
+  animation: dash-flow 0.9s linear infinite;
+}
+
+/* 登录错误抖动 */
+@keyframes shake {
+  10%, 90% { transform: translateX(-1px); }
+  20%, 80% { transform: translateX(2px); }
+  30%, 50%, 70% { transform: translateX(-4px); }
+  40%, 60% { transform: translateX(4px); }
+}
+.animate-shake {
+  animation: shake 0.45s ease both;
+}
+
+/* 登录页 aurora 缓慢漂移 */
+@keyframes aurora-a {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(60px, -40px) scale(1.2); }
+}
+@keyframes aurora-b {
+  0%, 100% { transform: translate(0, 0) scale(1.05); }
+  50% { transform: translate(-70px, 50px) scale(0.95); }
+}
+
+::selection {
+  background: #7c3aed;
+  color: #fff;
+}

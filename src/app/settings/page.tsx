@@ -329,7 +329,7 @@ export default function SettingsPage() {
         ) : (
           <>
             {renderGroup("chat", "对话供应商", "按优先级从上到下依次试错，全部失败才报错")}
-            {renderGroup("embedding", "向量供应商（RAG）", "仅优先级最高的启用项生效；维度须与 documents 表的向量维度一致（默认 1536）")}
+            {renderGroup("embedding", "向量供应商（RAG）", "把知识库文档切块转成向量存入 pgvector，供 rag-retrieve 节点做相似检索；仅优先级最高的启用项生效")}
           </>
         )}
       </div>
@@ -385,13 +385,26 @@ export default function SettingsPage() {
             />
           </Field>
           {form.kind === "embedding" && (
-            <Field label="维度">
-              <Input
-                value={form.dimensions}
-                onChange={(e) => setForm({ ...form, dimensions: e.target.value })}
-                placeholder="1536"
-              />
-            </Field>
+            <>
+              <Field label="维度">
+                <Input
+                  value={form.dimensions}
+                  onChange={(e) => setForm({ ...form, dimensions: e.target.value })}
+                  placeholder="1536"
+                />
+              </Field>
+              <div className="col-span-2 rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-3 text-[13px] leading-6 text-amber-800">
+                <p className="font-medium">关于维度：必须填 1536</p>
+                <p className="mt-1">
+                  数据库 <span className="font-mono">documents.embedding</span> 列是{" "}
+                  <span className="font-mono">vector(1536)</span>（见{" "}
+                  <span className="font-mono">supabase/schema.sql</span>，建表时写死），
+                  此处填其他值会导致向量写入失败。推荐{" "}
+                  <span className="font-mono">text-embedding-3-small</span>（1536
+                  维）或任意 OpenAI 兼容的 embeddings 接口。
+                </p>
+              </div>
+            </>
           )}
           <Field label="优先级（越小越先）">
             <Input
