@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabase } from "@/lib/supabase";
-import { createRun, type RunMode } from "@/lib/engine/runService";
+import { createRun, sweepStaleRuns, type RunMode } from "@/lib/engine/runService";
 
 export const dynamic = "force-dynamic";
 // Sync mode executes the whole graph inline — give it headroom on Vercel.
@@ -8,6 +8,8 @@ export const maxDuration = 60;
 
 export async function GET(req: NextRequest) {
   const sb = getSupabase();
+  // Opportunistic self-healing: never leave runs stuck in running/queued forever.
+  await sweepStaleRuns().catch(() => {});
   const { searchParams } = new URL(req.url);
   const workflowId = searchParams.get("workflowId");
   let q = sb

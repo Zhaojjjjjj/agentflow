@@ -72,7 +72,17 @@ export async function createRun(opts: {
       throw new Error("异步模式需要配置 INNGEST_EVENT_KEY（或使用同步模式）");
     }
     await sb.from("workflow_runs").update({ status: "running", started_at: now }).eq("id", runId);
-    await inngest.send({ name: EVENTS.RUN_REQUESTED, data: { runId } });
+    try {
+      await inngest.send({ name: EVENTS.RUN_REQUESTED, data: { runId } });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      await sb.from("workflow_runs").update({
+        status: "failed",
+        error: `Inngest 事件发送失败: ${msg}`,
+        finished_at: new Date().toISOString(),
+      }).eq("id", runId);
+      throw new Error(`Inngest 事件发送失败: ${msg}`);
+    }
     return { runId, mode: "async" };
   }
 
@@ -110,6 +120,31 @@ export async function createRun(opts: {
     }).eq("id", runId);
     throw e;
   }
+}
+
+/** Self-healing: mark runs stuck in queued/running beyond the timeout as failed.
+ * Covers: Inngest app not connected (event never consumed), Vercel killing a
+ * sync execution at maxDuration, or any other silent death. Call it lazily
+ * from read paths (e.g. GET /api/runs) so no cron infrastructure is needed. */
+export async function sweepStaleRuns(timeoutMinutes = 15): Promise<number> {
+  const sb = getSupabase();
+  const cutoff = new Date(Date.now() - timeoutMinutes * 60 * 1000).toISOString();
+  const { data, error } = await sb
+    .from("workflow_runs")
+    .update({
+      status: "failed",
+      error:
+        "执行超时未结束：若使用异步模式，请确认已在 Inngest 后台连接了应用地址（https://你的域名/api/inngest）；若使用同步模式，可能是执行超过平台时长限制被终止。请检查配置后重试。",
+      finished_at: new Date().toISOString(),
+    })
+    .in("status", ["queued", "running"])
+    .lt("created_at", cutoff)
+    .select("id");
+  if (error) {
+    console.warn(`[agentflow] sweepStaleRuns failed: ${error.message}`);
+    return 0;
+  }
+  return data?.length ?? 0;
 }
 
 /** Generate a new API key, storing only its SHA-256 hash. Returns the plaintext once. */
