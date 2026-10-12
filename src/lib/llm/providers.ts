@@ -1,4 +1,10 @@
 // OpenAI-compatible provider abstraction with ordered fallback.
+//
+// Resolution order: DB (llm_providers, enabled, by priority) -> env vars
+// (LLM_PROVIDER_{i}_*). The executor is unaware of the source.
+
+import { getSupabase } from "@/lib/supabase";
+import { decryptSecret } from "@/lib/crypto";
 
 export interface LLMProviderConfig {
   name: string;
@@ -46,6 +52,54 @@ function readProvidersFromEnv(): LLMProviderConfig[] {
   return providers;
 }
 
+/** Env-var providers with full details (server-side only, used by the "import" API). */
+export function readEnvProviders(): LLMProviderConfig[] {
+  return readProvidersFromEnv();
+}
+
+interface DbChatRow {
+  name: string;
+  base_url: string;
+  api_key_encrypted: string;
+  model: string;
+}
+
+/** Returns null when the DB has no usable rows (or the table is missing). */
+async function readProvidersFromDb(): Promise<LLMProviderConfig[] | null> {
+  try {
+    const db = getSupabase();
+    const { data, error } = await db
+      .from("llm_providers")
+      .select("name,base_url,api_key_encrypted,model")
+      .eq("kind", "chat")
+      .eq("enabled", true)
+      .order("priority", { ascending: true })
+      .order("created_at", { ascending: true });
+    if (error) {
+      // Table may not exist yet (migration not run) — fall back to env.
+      console.warn(`[agentflow] llm_providers read failed, using env config: ${error.message}`);
+      return null;
+    }
+    if (!data || data.length === 0) return null;
+    const rows = data as DbChatRow[];
+    return rows.map((r) => ({
+      name: r.name,
+      baseURL: (r.base_url || "").replace(/\/$/, ""),
+      apiKey: decryptSecret(r.api_key_encrypted),
+      model: r.model,
+    }));
+  } catch (e) {
+    console.warn(`[agentflow] llm_providers read failed, using env config: ${(e as Error).message}`);
+    return null;
+  }
+}
+
+/** Ordered chat providers: DB first, env fallback. */
+export async function getChatProviders(): Promise<LLMProviderConfig[]> {
+  const fromDb = await readProvidersFromDb();
+  return fromDb ?? readProvidersFromEnv();
+}
+
 async function chatOnce(
   provider: LLMProviderConfig,
   messages: ChatMessage[],
@@ -90,10 +144,10 @@ async function chatOnce(
  * Throws only when every provider fails (errors are chained in the message).
  */
 export async function chat(messages: ChatMessage[], options: ChatOptions = {}): Promise<ChatResult> {
-  const providers = readProvidersFromEnv();
+  const providers = await getChatProviders();
   if (providers.length === 0) {
     throw new Error(
-      "No LLM provider configured. Set LLM_PROVIDER_1_BASE_URL / LLM_PROVIDER_1_API_KEY / LLM_PROVIDER_1_MODEL."
+      "No LLM provider configured. Add one in 设置 / LLM 供应商, or set LLM_PROVIDER_1_BASE_URL / LLM_PROVIDER_1_API_KEY / LLM_PROVIDER_1_MODEL."
     );
   }
   const errors: string[] = [];
@@ -109,6 +163,6 @@ export async function chat(messages: ChatMessage[], options: ChatOptions = {}): 
   throw new Error(`All LLM providers failed:\n- ${errors.join("\n- ")}`);
 }
 
-export function configuredProviders(): string[] {
-  return readProvidersFromEnv().map((p) => p.name);
+export async function configuredProviders(): Promise<string[]> {
+  return (await getChatProviders()).map((p) => p.name);
 }

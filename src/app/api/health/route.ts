@@ -13,7 +13,7 @@ export async function GET() {
     supabase: isSupabaseConfigured(),
     redis,
     inngest,
-    llmProviders: configuredProviders(),
+    llmProviders: await configuredProviders(),
     embeddings,
     time: new Date().toISOString(),
   });

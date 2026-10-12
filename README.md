@@ -54,12 +54,15 @@
 
 ### 2. 建表
 
-在 Supabase Dashboard → SQL Editor 中执行 `supabase/schema.sql`（含 pgvector 扩展、表、向量索引、`match_documents` 函数）。
+在 Supabase Dashboard → SQL Editor 中执行 `supabase/schema.sql`（含 pgvector 扩展、表、向量索引、`match_documents` 函数），
+然后执行 `supabase/migrations/001_llm_providers.sql`（LLM 供应商注册表）。
 
 ### 3. 配置环境变量
 
 ```bash
 cp .env.example .env.local
+# 生成 API Key 加密密钥（后台管理 LLM 供应商必需）：
+openssl rand -hex 32
 ```
 
 | 变量 | 说明 |
@@ -67,9 +70,24 @@ cp .env.example .env.local
 | `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` | Supabase 项目设置 → API |
 | `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | 可选，未配置时自动降级 |
 | `INNGEST_EVENT_KEY` / `INNGEST_SIGNING_KEY` | Inngest → Keys；异步执行/定时/审批必需 |
-| `LLM_PROVIDER_1_*` | 主 LLM（OpenAI 兼容：baseURL/key/model），可配多个按顺序降级 |
-| `LLM_EMBEDDING_*` | RAG 向量化（baseURL/key/model/dimensions，需与表结构一致，默认 1536） |
+| `APP_ENCRYPTION_KEY` | `openssl rand -hex 32` 生成的 64 位 hex；后台增删 LLM 供应商必需（缺失时写操作直接报错） |
+| `LLM_PROVIDER_1_*` | 主 LLM（OpenAI 兼容：baseURL/key/model），可配多个按顺序降级；也可在后台配置后留空 |
+| `LLM_EMBEDDING_*` | RAG 向量化（baseURL/key/model/dimensions，需与表结构一致，默认 1536）；也可在后台配置后留空 |
 | `NEXT_PUBLIC_APP_URL` | 部署后的公网地址 |
+
+### 3.5 后台配置 LLM（推荐，不用改环境变量）
+
+打开 **LLM 设置** 页面（首页右上角），可视化管理供应商：
+
+- **供应商列表**：对话 / 向量分组展示，显示模型、Base URL、Key 掩码（`****abcd`，明文永不回显）、启用状态、优先级
+- **新增 / 编辑 / 删除**：Key 经 AES-256-GCM 加密后入库，密钥来自 `APP_ENCRYPTION_KEY`；编辑时 Key 留空即不修改
+- **启用 / 禁用**：一键开关；**↑ ↓** 调整优先级（对话供应商按优先级从上到下依次试错）
+- **测试连接**：服务端先调 `GET /models`，不通则发一次最小 chat 调用，返回成功/失败 + 耗时
+- **从环境变量导入**：一键把 `LLM_PROVIDER_{i}_*` 写入数据库（按名称幂等，已存在则跳过）
+
+解析顺序：**数据库优先**（`enabled=true`，按 `priority` 排序），数据库为空或迁移未执行时自动回退到环境变量——执行器无感切换。
+
+> 注意：向量供应商的 `dimensions` 须与 `documents.embedding` 的向量维度一致（默认 1536），否则入库会失败。
 
 ### 4. 本地运行
 
