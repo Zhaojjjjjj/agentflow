@@ -78,7 +78,6 @@ interface ExecState {
   stats: { tokens: number; cost: number };
   depth: number;
   prefix: string;
-  rejected: boolean;
 }
 
 export interface GraphExecArgs {
@@ -304,7 +303,9 @@ async function executeNode(
           trace: st.trace,
           stats: st.stats,
           depth: st.depth + 1,
-          prefix: `${fullId}/`,
+          // Include the iteration index so trace rows (and approval keys)
+          // are unique per iteration, e.g. "loop-1[2]/sub-llm-1".
+          prefix: `${fullId}[${i}]/`,
         });
         results.push(sub.outputs);
       }
@@ -380,7 +381,6 @@ export async function executeGraph(args: GraphExecArgs): Promise<{
     stats,
     depth: args.depth ?? 0,
     prefix: args.prefix ?? "",
-    rejected: false,
   };
   const ctx: Record<string, unknown> = { ...baseContext };
 
@@ -456,11 +456,6 @@ export async function executeGraph(args: GraphExecArgs): Promise<{
       trace.stepEnd(traceId, { status: "failed", error, durationMs: Date.now() - t0 });
 
     try {
-      if (st.rejected) {
-        await trace.stepEnd(traceId, { status: "skipped", durationMs: Date.now() - t0 });
-        markSkipped(id);
-        return;
-      }
       let result: NodeResult;
       if (node.type === "human-approval") {
         const cfg = node.data.config || {};
@@ -483,14 +478,14 @@ export async function executeGraph(args: GraphExecArgs): Promise<{
           result = { output: { decision: "approved", comment: decision.comment ?? "" }, tokens: 0, cost: 0 };
         } else {
           const reason = decision.comment ? `：${decision.comment}` : "";
+          const msg = `人工审批被拒绝${reason}`;
           await trace.stepEnd(traceId, {
             status: "failed",
-            error: `人工审批被拒绝${reason}`,
+            error: msg,
             durationMs: Date.now() - t0,
           });
-          st.rejected = true;
-          markSkipped(id);
-          return;
+          // Propagate: the caller records the run as "rejected" (not "failed").
+          throw new RejectedError(msg);
         }
       } else {
         result = await runner.run(`node:${fullId}`, () => executeNode(node, ctx, st, fullId));
@@ -504,9 +499,9 @@ export async function executeGraph(args: GraphExecArgs): Promise<{
       }
     } catch (err) {
       if (err instanceof RejectedError) {
-        st.rejected = true;
-        markSkipped(id);
-        return;
+        // Don't mark the step "failed" again — propagate so the run is
+        // recorded as "rejected" by the caller.
+        throw err;
       }
       const msg = err instanceof Error ? err.message : String(err);
       await finishFail(msg).catch(() => undefined);
@@ -526,7 +521,6 @@ export async function executeGraph(args: GraphExecArgs): Promise<{
         return runNode(id);
       })
     );
-    if (st.rejected) break;
   }
 
   // Merge outputs from all output nodes that actually ran

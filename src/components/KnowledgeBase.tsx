@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Modal from "./Modal";
+import { Button, ConfirmDialog } from "./ui";
+import { toast } from "./toast";
 
 interface Doc {
   id: string;
@@ -20,7 +23,7 @@ export default function KnowledgeBase({
   const [docs, setDocs] = useState<Doc[]>([]);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState("");
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const load = async () => {
     const res = await fetch(`/api/documents?workflowId=${workflowId}`);
@@ -36,7 +39,6 @@ export default function KnowledgeBase({
       .map((content) => ({ content }));
     if (chunks.length === 0) return;
     setBusy(true);
-    setMsg("");
     try {
       const res = await fetch("/api/documents", {
         method: "POST",
@@ -45,19 +47,27 @@ export default function KnowledgeBase({
       });
       const j = await res.json();
       if (!res.ok) throw new Error(j.error || "上传失败");
-      setMsg(`成功写入 ${j.inserted} 个 chunk${j.errors?.length ? `，${j.errors.length} 个失败` : ""}`);
+      toast.success(
+        `成功写入 ${j.inserted} 个 chunk${j.errors?.length ? `，${j.errors.length} 个失败` : ""}`
+      );
       setText("");
       await load();
     } catch (e) {
-      setMsg(e instanceof Error ? e.message : String(e));
+      toast.error(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }
   };
 
   const remove = async (id: string) => {
-    await fetch(`/api/documents/${id}`, { method: "DELETE" });
-    await load();
+    try {
+      const res = await fetch(`/api/documents/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("删除失败");
+      toast.success("已删除");
+      await load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e));
+    }
   };
 
   useEffect(() => {
@@ -66,46 +76,56 @@ export default function KnowledgeBase({
       load().catch(() => undefined);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open ]);
-
-  if (!open) return null;
+  }, [open]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="card max-h-[85vh] w-full max-w-2xl overflow-y-auto p-5" onClick={(e) => e.stopPropagation()}>
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-base font-semibold">知识库（RAG）</h3>
-          <button className="text-slate-400 hover:text-slate-600" onClick={onClose}>✕</button>
-        </div>
-        <p className="mb-2 text-xs text-slate-500">
+    <>
+      <Modal open={open} onClose={onClose} title="知识库（RAG）" wide>
+        <p className="mb-3 text-xs leading-5 text-slate-500">
           粘贴文本（空行分隔为多个 chunk），将自动向量化存入 pgvector，供 rag-retrieve 节点检索。
         </p>
         <textarea
-          className="input mb-2"
+          className="input mb-3"
           rows={5}
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder={"第一段知识…\n\n第二段知识…"}
         />
-        <div className="mb-4 flex items-center gap-3">
-          <button className="btn-primary" disabled={busy || !text.trim()} onClick={add}>
+        <div className="mb-5">
+          <Button variant="primary" disabled={busy || !text.trim()} onClick={add}>
             {busy ? "向量化中…" : "添加到知识库"}
-          </button>
-          {msg && <span className="text-xs text-slate-500">{msg}</span>}
+          </Button>
         </div>
         <div className="space-y-2">
           {docs.map((d) => (
-            <div key={d.id} className="rounded-lg border border-slate-200 p-3 text-sm">
-              <p className="line-clamp-3 text-slate-700">{d.content}</p>
-              <div className="mt-2 flex justify-between text-[11px] text-slate-400">
+            <div key={d.id} className="rounded-xl border border-slate-200 bg-white p-3.5">
+              <p className="line-clamp-3 text-sm leading-6 text-slate-700">{d.content}</p>
+              <div className="mt-2 flex items-center justify-between text-[11px] text-slate-400">
                 <span>{new Date(d.created_at).toLocaleString()}</span>
-                <button className="text-red-500 hover:underline" onClick={() => remove(d.id)}>删除</button>
+                <button
+                  className="rounded-md px-1.5 py-0.5 text-red-500 transition-colors duration-150 hover:bg-red-50"
+                  onClick={() => setDeleteId(d.id)}
+                >
+                  删除
+                </button>
               </div>
             </div>
           ))}
-          {docs.length === 0 && <p className="text-sm text-slate-400">暂无文档</p>}
+          {docs.length === 0 && <p className="py-6 text-center text-sm text-slate-400">暂无文档</p>}
         </div>
-      </div>
-    </div>
+      </Modal>
+
+      <ConfirmDialog
+        open={deleteId !== null}
+        title="删除文档"
+        description="确定删除这个知识库文档 chunk 吗？检索时将不再命中它。"
+        confirmLabel="删除"
+        danger
+        onConfirm={() => {
+          if (deleteId) void remove(deleteId);
+        }}
+        onClose={() => setDeleteId(null)}
+      />
+    </>
   );
 }

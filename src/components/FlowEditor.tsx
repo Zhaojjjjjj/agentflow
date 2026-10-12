@@ -1,13 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ReactFlow,
   ReactFlowProvider,
   Background,
   Controls,
   MiniMap,
-  Panel,
+  useReactFlow,
   type NodeTypes,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
@@ -18,20 +20,54 @@ import NodeConfigPanel from "./NodeConfigPanel";
 import RunDialog from "./RunDialog";
 import KnowledgeBase from "./KnowledgeBase";
 import Modal from "./Modal";
+import { Button, Badge, Field, Input, ConfirmDialog } from "./ui";
+import { toast } from "./toast";
 
 const nodeTypes: NodeTypes = { agentNode: FlowNodeView };
 
-const PALETTE: NodeType[] = [
-  "trigger-manual",
-  "trigger-schedule",
-  "llm",
-  "http-request",
-  "rag-retrieve",
-  "condition",
-  "loop",
-  "human-approval",
-  "output",
-];
+const GROUP_ORDER = ["触发器", "AI", "工具", "逻辑", "输出"];
+
+function NodePanel({ onAdd }: { onAdd: (t: NodeType) => void }) {
+  const [q, setQ] = useState("");
+  const groups = GROUP_ORDER.map((g) => ({
+    name: g,
+    items: (Object.keys(NODE_META) as NodeType[]).filter(
+      (t) => NODE_META[t].category === g && (!q.trim() || NODE_META[t].label.includes(q.trim()))
+    ),
+  })).filter((g) => g.items.length > 0);
+
+  return (
+    <aside className="flex w-56 shrink-0 flex-col border-r border-slate-200 bg-white">
+      <div className="border-b border-slate-100 p-3">
+        <Input placeholder="搜索节点…" value={q} onChange={(e) => setQ(e.target.value)} />
+      </div>
+      <div className="flex-1 overflow-y-auto p-3">
+        {groups.map((g) => (
+          <div key={g.name} className="mb-4 last:mb-0">
+            <p className="mb-1 px-1.5 text-[11px] font-medium text-slate-400">{g.name}</p>
+            {g.items.map((t) => (
+              <button
+                key={t}
+                title={NODE_META[t].description}
+                onClick={() => onAdd(t)}
+                className="mb-0.5 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[13px] text-slate-600 transition-colors duration-150 hover:bg-brand-50 hover:text-brand-700"
+              >
+                <span
+                  className="h-2 w-2 shrink-0 rounded-full"
+                  style={{ background: NODE_META[t].color }}
+                />
+                {NODE_META[t].label}
+              </button>
+            ))}
+          </div>
+        ))}
+        {groups.length === 0 && (
+          <p className="px-1 py-6 text-center text-xs text-slate-400">没有匹配的节点</p>
+        )}
+      </div>
+    </aside>
+  );
+}
 
 interface VersionRow {
   version: number;
@@ -39,11 +75,16 @@ interface VersionRow {
   created_at: string;
 }
 
+const LINK_BTN_SM =
+  "inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 transition-colors duration-150 hover:bg-slate-100";
+
 function EditorInner({ workflowId }: { workflowId: string }) {
+  const router = useRouter();
+  const reactFlow = useReactFlow();
+  const wrapperRef = useRef<HTMLDivElement>(null);
   const {
     nodes,
     edges,
-    selectedId,
     dirty,
     onNodesChange,
     onEdgesChange,
@@ -65,11 +106,11 @@ function EditorInner({ workflowId }: { workflowId: string }) {
   const [publishOpen, setPublishOpen] = useState(false);
   const [versionsOpen, setVersionsOpen] = useState(false);
   const [versions, setVersions] = useState<VersionRow[]>([]);
+  const [restoreTarget, setRestoreTarget] = useState<number | null>(null);
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [scheduleCron, setScheduleCron] = useState("");
   const [scheduleEnabled, setScheduleEnabled] = useState(false);
   const [apiKey, setApiKey] = useState("");
-  const [notice, setNotice] = useState("");
 
   const loadWorkflow = useCallback(async () => {
     const res = await fetch(`/api/workflows/${workflowId}`);
@@ -90,6 +131,24 @@ function EditorInner({ workflowId }: { workflowId: string }) {
     void loadWorkflow();
   }, [loadWorkflow]);
 
+  /** 在画布视口中央添加节点 */
+  const addAtCenter = useCallback(
+    (type: NodeType) => {
+      const el = wrapperRef.current;
+      if (el) {
+        const rect = el.getBoundingClientRect();
+        const pos = reactFlow.screenToFlowPosition({
+          x: rect.left + rect.width / 2,
+          y: rect.top + rect.height / 2,
+        });
+        addNode(type, pos);
+      } else {
+        addNode(type);
+      }
+    },
+    [reactFlow, addNode]
+  );
+
   const save = async (silent = false) => {
     setSaving(true);
     try {
@@ -102,9 +161,9 @@ function EditorInner({ workflowId }: { workflowId: string }) {
       if (!res.ok) throw new Error(j.error || "保存失败");
       markClean();
       await loadWorkflow();
-      if (!silent) setNotice("已保存");
+      if (!silent) toast.success("已保存");
     } catch (e) {
-      setNotice(e instanceof Error ? e.message : String(e));
+      toast.error(e instanceof Error ? e.message : String(e));
     } finally {
       setSaving(false);
     }
@@ -119,7 +178,7 @@ function EditorInner({ workflowId }: { workflowId: string }) {
     });
     const j = await res.json();
     if (!res.ok) throw new Error(j.error || "启动失败");
-    window.location.href = `/runs/${j.runId}`;
+    router.push(`/runs/${j.runId}`);
   };
 
   const togglePublish = async () => {
@@ -131,6 +190,9 @@ function EditorInner({ workflowId }: { workflowId: string }) {
     if (res.ok) {
       setIsPublished(!isPublished);
       setPublishOpen(true);
+      toast.success(!isPublished ? "已发布为 HTTP API" : "已取消发布");
+    } else {
+      toast.error("操作失败");
     }
   };
 
@@ -142,12 +204,13 @@ function EditorInner({ workflowId }: { workflowId: string }) {
   };
 
   const restoreVersion = async (v: number) => {
-    if (!confirm(`确定恢复到 v${v} 吗？当前内容将被覆盖（会先保存为新版本）。`)) return;
     const res = await fetch(`/api/workflows/${workflowId}/versions/${v}/restore`, { method: "POST" });
     if (res.ok) {
       setVersionsOpen(false);
       await loadWorkflow();
-      setNotice(`已恢复到 v${v}`);
+      toast.success(`已恢复到 v${v}`);
+    } else {
+      toast.error("恢复失败");
     }
   };
 
@@ -159,11 +222,11 @@ function EditorInner({ workflowId }: { workflowId: string }) {
     });
     const j = await res.json();
     if (!res.ok) {
-      setNotice(j.error || "保存失败");
+      toast.error(j.error || "保存失败");
       return;
     }
     setScheduleOpen(false);
-    setNotice("定时设置已保存");
+    toast.success("定时设置已保存");
   };
 
   const createApiKey = async () => {
@@ -174,41 +237,70 @@ function EditorInner({ workflowId }: { workflowId: string }) {
     });
     const j = await res.json();
     if (res.ok) setApiKey(j.key);
-    else setNotice(j.error || "创建失败");
+    else toast.error(j.error || "创建失败");
+  };
+
+  const copyApiKey = async () => {
+    try {
+      await navigator.clipboard.writeText(apiKey);
+      toast.success("已复制到剪贴板");
+    } catch {
+      toast.error("复制失败，请手动复制");
+    }
   };
 
   return (
-    <div className="flex h-screen flex-col">
+    <div className="flex h-screen flex-col bg-white">
       {/* toolbar */}
       <header className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white px-4 py-2.5">
-        <a href="/" className="mr-1 text-slate-400 hover:text-slate-600">←</a>
+        <Link
+          href="/"
+          title="返回工作流列表"
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-base text-slate-400 transition-colors duration-150 hover:bg-slate-100 hover:text-slate-600"
+        >
+          ←
+        </Link>
+        <div className="h-5 w-px bg-slate-200" />
         <input
-          className="w-52 rounded-lg border border-transparent px-2 py-1.5 text-base font-bold outline-none hover:border-slate-200 focus:border-brand-500"
+          className="w-52 rounded-lg border border-transparent px-2 py-1.5 text-[15px] font-semibold text-slate-900 outline-none transition-colors duration-150 hover:border-slate-200 focus:border-brand-500"
           value={name}
           onChange={(e) => setName(e.target.value)}
+          placeholder="工作流名称"
         />
-        <span className="text-xs text-slate-400">v{version}</span>
-        {isPublished && <span className="badge bg-green-100 text-green-700">已发布</span>}
-        {dirty && <span className="badge bg-amber-100 text-amber-700">未保存</span>}
-        <div className="ml-auto flex flex-wrap items-center gap-2">
-          {notice && <span className="text-xs text-slate-500">{notice}</span>}
-          <button className="btn-secondary" onClick={() => setKbOpen(true)}>知识库</button>
-          <button className="btn-secondary" onClick={() => setScheduleOpen(true)}>定时</button>
-          <button className="btn-secondary" onClick={openVersions}>版本</button>
-          <a className="btn-secondary" href={`/workflows/${workflowId}/runs`}>运行历史</a>
-          <button className="btn-secondary" onClick={togglePublish}>
+        <Badge tone="gray">v{version}</Badge>
+        {isPublished && <Badge tone="green">已发布</Badge>}
+        {dirty && <Badge tone="amber">未保存</Badge>}
+        <div className="ml-auto flex flex-wrap items-center gap-1.5">
+          <Button size="sm" variant="secondary" onClick={() => setKbOpen(true)}>
+            知识库
+          </Button>
+          <Button size="sm" variant="secondary" onClick={() => setScheduleOpen(true)}>
+            定时
+          </Button>
+          <Button size="sm" variant="secondary" onClick={openVersions}>
+            版本
+          </Button>
+          <Link href={`/workflows/${workflowId}/runs`} className={LINK_BTN_SM}>
+            运行历史
+          </Link>
+          <div className="mx-1 h-5 w-px bg-slate-200" />
+          <Button size="sm" variant="secondary" onClick={togglePublish}>
             {isPublished ? "取消发布" : "发布"}
-          </button>
-          <button className="btn-secondary" disabled={saving} onClick={() => save()}>
+          </Button>
+          <Button size="sm" variant="secondary" disabled={saving} onClick={() => save()}>
             {saving ? "保存中…" : "保存"}
-          </button>
-          <button className="btn-primary" onClick={() => setRunOpen(true)}>▶ 运行</button>
+          </Button>
+          <Button size="sm" variant="primary" onClick={() => setRunOpen(true)}>
+            运行
+          </Button>
         </div>
       </header>
 
       <div className="flex min-h-0 flex-1">
+        <NodePanel onAdd={addAtCenter} />
+
         {/* canvas */}
-        <div className="relative min-w-0 flex-1">
+        <div className="relative min-w-0 flex-1 bg-white" ref={wrapperRef}>
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -221,26 +313,37 @@ function EditorInner({ workflowId }: { workflowId: string }) {
             fitView
             proOptions={{ hideAttribution: true }}
           >
-            <Background />
-            <Controls />
-            <MiniMap pannable zoomable />
-            <Panel position="top-left">
-              <div className="card flex flex-wrap gap-1.5 p-2">
-                {PALETTE.map((t) => (
-                  <button
-                    key={t}
-                    title={NODE_META[t].description}
-                    onClick={() => addNode(t)}
-                    className="rounded-lg border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:border-brand-400 hover:text-brand-600"
-                  >
-                    + {NODE_META[t].label}
-                  </button>
-                ))}
+            <Background color="#e9ebf1" gap={24} />
+            <Controls
+              style={{
+                borderRadius: 8,
+                border: "1px solid #e2e8f0",
+                boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
+                overflow: "hidden",
+              }}
+            />
+            <MiniMap
+              pannable
+              zoomable
+              style={{
+                backgroundColor: "#ffffff",
+                borderRadius: 8,
+                border: "1px solid #e2e8f0",
+                boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
+              }}
+              maskColor="rgba(15,23,42,0.06)"
+            />
+            {nodes.length === 0 && (
+              <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
+                <p className="rounded-full border border-slate-200 bg-white/90 px-4 py-2 text-sm text-slate-400 shadow-sm">
+                  从左侧面板添加节点开始编排
+                </p>
               </div>
-            </Panel>
+            )}
           </ReactFlow>
         </div>
-        {/* config panel */}
+
+        {/* config drawer */}
         <aside className="w-80 shrink-0 border-l border-slate-200 bg-white">
           <NodeConfigPanel />
         </aside>
@@ -254,19 +357,32 @@ function EditorInner({ workflowId }: { workflowId: string }) {
         {isPublished ? (
           <div className="space-y-3 text-sm">
             <p>
-              <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs">
+              <code className="rounded-lg bg-slate-100 px-2 py-1 font-mono text-xs text-slate-700">
                 POST /api/public/workflows/{workflowId}/run
               </code>
             </p>
-            <p className="text-slate-500">请求头：x-api-key（或 Authorization: Bearer）。Body：{"{ input, mode: 'sync'|'async' }"}</p>
-            <button className="btn-secondary" onClick={createApiKey}>生成新的 API Key</button>
+            <p className="text-slate-500">
+              请求头：x-api-key（或 Authorization: Bearer）。Body：{"{ input, mode: 'sync'|'async' }"}
+            </p>
+            <Button size="sm" variant="secondary" onClick={createApiKey}>
+              生成新的 API Key
+            </Button>
             {apiKey && (
-              <div className="rounded-lg bg-amber-50 p-3">
-                <p className="mb-1 text-xs font-semibold text-amber-700">请立即复制，关闭后不再显示：</p>
-                <code className="break-all font-mono text-xs">{apiKey}</code>
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3.5">
+                <p className="mb-1.5 text-xs font-semibold text-amber-700">请立即复制，关闭后不再显示：</p>
+                <code className="break-all font-mono text-xs text-slate-700">{apiKey}</code>
+                <div className="mt-2">
+                  <Button size="sm" variant="secondary" onClick={copyApiKey}>
+                    复制
+                  </Button>
+                </div>
               </div>
             )}
-            <a className="btn-secondary inline-flex" href="/api-keys">管理全部 Key →</a>
+            <div>
+              <Link href="/api-keys" className={LINK_BTN_SM}>
+                管理全部 Key →
+              </Link>
+            </div>
           </div>
         ) : (
           <p className="text-sm text-slate-500">已取消发布，公开 API 不可用。</p>
@@ -277,30 +393,67 @@ function EditorInner({ workflowId }: { workflowId: string }) {
       <Modal open={versionsOpen} onClose={() => setVersionsOpen(false)} title="版本历史">
         <div className="space-y-2">
           {versions.map((v) => (
-            <div key={v.version} className="flex items-center justify-between rounded-lg border border-slate-200 p-2.5 text-sm">
+            <div
+              key={v.version}
+              className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-3 text-sm"
+            >
               <div>
-                <span className="font-semibold">v{v.version}</span>
+                <span className="font-semibold text-slate-900">v{v.version}</span>
                 <span className="ml-2 text-slate-500">{v.note}</span>
-                <div className="text-[11px] text-slate-400">{new Date(v.created_at).toLocaleString()}</div>
+                <div className="mt-0.5 text-[11px] text-slate-400">
+                  {new Date(v.created_at).toLocaleString()}
+                </div>
               </div>
-              <button className="btn-secondary" onClick={() => restoreVersion(v.version)}>恢复</button>
+              <Button size="sm" variant="secondary" onClick={() => setRestoreTarget(v.version)}>
+                恢复
+              </Button>
             </div>
           ))}
-          {versions.length === 0 && <p className="text-sm text-slate-400">暂无版本（保存后自动生成）</p>}
+          {versions.length === 0 && (
+            <p className="py-6 text-center text-sm text-slate-400">暂无版本（保存后自动生成）</p>
+          )}
         </div>
       </Modal>
 
+      <ConfirmDialog
+        open={restoreTarget !== null}
+        title={`恢复到 v${restoreTarget}`}
+        description="当前内容将被覆盖（会先保存为新版本）。确定继续吗？"
+        confirmLabel="恢复"
+        onConfirm={() => {
+          if (restoreTarget !== null) void restoreVersion(restoreTarget);
+        }}
+        onClose={() => setRestoreTarget(null)}
+      />
+
       {/* schedule */}
       <Modal open={scheduleOpen} onClose={() => setScheduleOpen(false)} title="定时触发">
-        <label className="mb-3 flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={scheduleEnabled} onChange={(e) => setScheduleEnabled(e.target.checked)} />
-          启用定时运行（UTC）
-        </label>
-        <label className="label">Cron 表达式（分 时 日 月 周）</label>
-        <input className="input mb-4 font-mono" value={scheduleCron} onChange={(e) => setScheduleCron(e.target.value)} placeholder="0 9 * * *" />
-        <div className="flex justify-end gap-2">
-          <button className="btn-secondary" onClick={() => setScheduleOpen(false)}>取消</button>
-          <button className="btn-primary" onClick={saveSchedule}>保存</button>
+        <Field label="启用定时运行（UTC）">
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-700">
+            <input
+              type="checkbox"
+              checked={scheduleEnabled}
+              onChange={(e) => setScheduleEnabled(e.target.checked)}
+              className="h-4 w-4 accent-brand-600"
+            />
+            启用
+          </label>
+        </Field>
+        <Field label="Cron 表达式（分 时 日 月 周）">
+          <Input
+            className="font-mono"
+            value={scheduleCron}
+            onChange={(e) => setScheduleCron(e.target.value)}
+            placeholder="0 9 * * *"
+          />
+        </Field>
+        <div className="mt-4 flex justify-end gap-2">
+          <Button variant="secondary" onClick={() => setScheduleOpen(false)}>
+            取消
+          </Button>
+          <Button variant="primary" onClick={saveSchedule}>
+            保存
+          </Button>
         </div>
       </Modal>
     </div>

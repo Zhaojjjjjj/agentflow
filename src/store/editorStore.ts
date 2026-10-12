@@ -13,6 +13,8 @@ import {
   type Connection,
 } from "@xyflow/react";
 import type { FlowNodeConfig, NodeType, WorkflowDefinition } from "@/lib/engine/types";
+import { NODE_META, findCycle } from "@/lib/engine/types";
+import { toast } from "@/components/toast";
 
 export interface AgentNodeData extends Record<string, unknown> {
   label: string;
@@ -99,7 +101,7 @@ interface EditorState {
   onEdgesChange: OnEdgesChange<AgentEdge>;
   onConnect: OnConnect;
   setSelected: (id: string | null) => void;
-  addNode: (type: NodeType) => void;
+  addNode: (type: NodeType, position?: { x: number; y: number }) => void;
   removeNode: (id: string) => void;
   updateNodeLabel: (id: string, label: string) => void;
   updateNodeConfig: (id: string, config: FlowNodeConfig) => void;
@@ -116,19 +118,55 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   onNodesChange: (changes) => set((s) => ({ nodes: applyNodeChanges(changes, s.nodes), dirty: true })),
   onEdgesChange: (changes) => set((s) => ({ edges: applyEdgeChanges(changes, s.edges), dirty: true })),
-  onConnect: (conn: Connection) =>
-    set((s) => ({ edges: addEdge({ ...conn, id: nid("e") }, s.edges), dirty: true })),
+  onConnect: (conn: Connection) => {
+    if (!conn.source || !conn.target) return;
+    // 防呆：新连线会形成循环依赖时直接拒绝，并用 toast 提示
+    const { nodes, edges } = get();
+    const candidate = {
+      id: nid("e"),
+      source: conn.source,
+      target: conn.target,
+      sourceHandle: conn.sourceHandle ?? null,
+      targetHandle: conn.targetHandle ?? null,
+    };
+    const def = {
+      nodes: nodes.map((n) => ({
+        id: n.id,
+        type: n.data.nodeType,
+        position: n.position,
+        data: { label: n.data.label, config: n.data.config },
+      })),
+      edges: [
+        ...edges.map((e) => ({
+          id: e.id,
+          source: e.source,
+          target: e.target,
+          sourceHandle: e.sourceHandle ?? null,
+          targetHandle: e.targetHandle ?? null,
+        })),
+        candidate,
+      ],
+    };
+    if (findCycle(def)) {
+      toast.error("连接会形成循环依赖，已拒绝");
+      return;
+    }
+    set((s) => ({ edges: addEdge({ ...conn, id: candidate.id }, s.edges), dirty: true }));
+  },
 
   setSelected: (id) => set({ selectedId: id }),
 
-  addNode: (type) =>
+  addNode: (type, position) =>
     set((s) => {
       const n = s.nodes.length;
+      const pos = position
+        ? { x: position.x + ((n * 37) % 60) - 30, y: position.y + ((n * 53) % 60) - 30 }
+        : { x: 120 + (n % 6) * 60, y: 120 + Math.floor(n / 6) * 80 };
       const node: AgentNode = {
         id: nid(type),
         type: "agentNode",
-        position: { x: 120 + (n % 6) * 60, y: 120 + Math.floor(n / 6) * 80 },
-        data: { label: type, config: defaultConfig(type), nodeType: type },
+        position: pos,
+        data: { label: NODE_META[type].label, config: defaultConfig(type), nodeType: type },
       };
       return { nodes: [...s.nodes, node], selectedId: node.id, dirty: true };
     }),

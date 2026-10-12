@@ -2,7 +2,7 @@ import { inngest, EVENTS } from "../src/lib/inngest";
 import { getSupabase } from "../src/lib/supabase";
 import { executeGraph, RejectedError } from "../src/lib/engine/executor";
 import { makeInngestRunner } from "../src/lib/engine/runners";
-import { SupabaseTraceWriter } from "../src/lib/engine/trace";
+import { SupabaseTraceWriter, sumRunStats } from "../src/lib/engine/trace";
 import { cronNext, validateCron } from "../src/lib/engine/cron";
 import type { WorkflowDefinition } from "../src/lib/engine/types";
 
@@ -51,27 +51,30 @@ export const executeWorkflowFn = inngest.createFunction(
         trace,
         stats,
       });
+      // Totals come from trace rows (retry-safe), not the in-memory accumulator.
+      const totals = await sumRunStats(runId);
       await sb
         .from("workflow_runs")
         .update({
           status: "succeeded",
           output: outputs,
-          total_tokens: stats.tokens,
-          estimated_cost_usd: stats.cost,
+          total_tokens: totals.tokens,
+          estimated_cost_usd: totals.cost,
           finished_at: new Date().toISOString(),
         })
         .eq("id", runId);
       return { runId, status: "succeeded" };
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
+      const totals = await sumRunStats(runId).catch(() => ({ tokens: 0, cost: 0 }));
       if (e instanceof RejectedError) {
         await sb
           .from("workflow_runs")
           .update({
             status: "rejected",
             error: msg,
-            total_tokens: stats.tokens,
-            estimated_cost_usd: stats.cost,
+            total_tokens: totals.tokens,
+            estimated_cost_usd: totals.cost,
             finished_at: new Date().toISOString(),
           })
           .eq("id", runId);
@@ -82,8 +85,8 @@ export const executeWorkflowFn = inngest.createFunction(
         .update({
           status: "failed",
           error: msg,
-          total_tokens: stats.tokens,
-          estimated_cost_usd: stats.cost,
+          total_tokens: totals.tokens,
+          estimated_cost_usd: totals.cost,
           finished_at: new Date().toISOString(),
         })
         .eq("id", runId);

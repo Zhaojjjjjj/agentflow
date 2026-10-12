@@ -134,3 +134,45 @@ export function emptyDefinition(): WorkflowDefinition {
     edges: [{ id: "e1", source: "trigger-1", target: "output-1" }],
   };
 }
+
+/**
+ * Detect a dependency cycle in the graph. Returns the cycle as a list of
+ * node ids (e.g. ["a", "b", "a"]), or null when the graph is a valid DAG.
+ * A cyclic graph would otherwise execute as a silent no-op.
+ */
+export function findCycle(def: WorkflowDefinition): string[] | null {
+  const adj = new Map<string, string[]>();
+  for (const n of def.nodes) adj.set(n.id, []);
+  for (const e of def.edges) {
+    if (adj.has(e.source) && adj.has(e.target)) {
+      adj.get(e.source)!.push(e.target);
+    }
+  }
+  const state = new Map<string, 0 | 1 | 2>(); // 0=unvisited 1=in-stack 2=done
+  const stack: string[] = [];
+  const visit = (id: string): string[] | null => {
+    state.set(id, 1);
+    stack.push(id);
+    for (const next of adj.get(id) || []) {
+      const s = state.get(next) ?? 0;
+      if (s === 1) {
+        const i = stack.indexOf(next);
+        return [...stack.slice(i), next];
+      }
+      if (s === 0) {
+        const c = visit(next);
+        if (c) return c;
+      }
+    }
+    stack.pop();
+    state.set(id, 2);
+    return null;
+  };
+  for (const n of def.nodes) {
+    if ((state.get(n.id) ?? 0) === 0) {
+      const c = visit(n.id);
+      if (c) return c;
+    }
+  }
+  return null;
+}

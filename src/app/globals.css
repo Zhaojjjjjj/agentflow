@@ -4,19 +4,19 @@
 
 @layer components {
   .btn {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-medium transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed;
   }
   .btn-primary {
     @apply btn bg-brand-600 text-white hover:bg-brand-700;
   }
   .btn-secondary {
-    @apply btn border border-slate-300 bg-white text-slate-700 hover:bg-slate-100;
+    @apply btn border border-slate-200 bg-white text-slate-700 hover:bg-slate-100;
   }
   .btn-danger {
     @apply btn border border-red-200 bg-white text-red-600 hover:bg-red-50;
   }
   .input {
-    @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100;
+    @apply w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition-colors duration-150 placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-100;
   }
   .label {
     @apply mb-1 block text-xs font-medium text-slate-600;
@@ -27,4 +27,12 @@
   .badge {
     @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium;
   }
+}
+
+/* React Flow 连线：默认浅灰，hover 高亮紫色（非 layer，避免被 xyflow 默认样式覆盖） */
+.react-flow__edge:not(.selected) .react-flow__edge-path {
+  stroke: #cbd5e1;
+}
+.react-flow__edge:not(.selected):hover .react-flow__edge-path {
+  stroke: #7c3aed;
 }

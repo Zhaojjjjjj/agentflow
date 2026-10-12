@@ -1,10 +1,229 @@
 "use client";
 
-import type { ReactNode } from "react";
+import type { ButtonHTMLAttributes, ReactNode } from "react";
+
+/* ---------- Button ---------- */
+
+type ButtonVariant = "primary" | "secondary" | "danger" | "ghost";
+type ButtonSize = "sm" | "md";
+
+const BUTTON_VARIANT: Record<ButtonVariant, string> = {
+  primary: "bg-brand-600 text-white hover:bg-brand-700",
+  secondary: "border border-slate-200 bg-white text-slate-700 hover:bg-slate-100",
+  danger: "border border-red-200 bg-white text-red-600 hover:bg-red-50",
+  ghost: "text-slate-600 hover:bg-slate-100",
+};
+
+const BUTTON_SIZE: Record<ButtonSize, string> = {
+  sm: "px-2.5 py-1.5 text-xs",
+  md: "px-3.5 py-2 text-sm",
+};
+
+interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: ButtonVariant;
+  size?: ButtonSize;
+}
+
+export function Button({ variant = "secondary", size = "md", className = "", ...rest }: ButtonProps) {
+  return (
+    <button
+      className={`inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg font-medium transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50 ${BUTTON_VARIANT[variant]} ${BUTTON_SIZE[size]} ${className}`}
+      {...rest}
+    />
+  );
+}
+
+/* ---------- Badge ---------- */
+
+type BadgeTone = "purple" | "green" | "red" | "amber" | "gray";
+
+const BADGE_TONE: Record<BadgeTone, string> = {
+  purple: "bg-brand-100 text-brand-700",
+  green: "bg-green-100 text-green-700",
+  red: "bg-red-100 text-red-700",
+  amber: "bg-amber-100 text-amber-700",
+  gray: "bg-slate-100 text-slate-500",
+};
+
+export function Badge({
+  tone = "gray",
+  className = "",
+  children,
+}: {
+  tone?: BadgeTone;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${BADGE_TONE[tone]} ${className}`}>
+      {children}
+    </span>
+  );
+}
+
+/* ---------- Field / Input / Textarea / Select ---------- */
+
+export function Field({
+  label,
+  required,
+  hint,
+  error,
+  children,
+}: {
+  label: string;
+  required?: boolean;
+  hint?: string;
+  error?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="mb-3">
+      <label className="mb-1 block text-xs font-medium text-slate-600">
+        {label}
+        {required && <span className="ml-0.5 text-red-500">*</span>}
+      </label>
+      {children}
+      {error ? (
+        <p className="mt-1 text-xs leading-4 text-red-600">{error}</p>
+      ) : (
+        hint && <p className="mt-1 text-[11px] leading-4 text-slate-400">{hint}</p>
+      )}
+    </div>
+  );
+}
+
+const INPUT_CLS =
+  "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition-colors duration-150 placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-100";
+
+export function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
+  return <input {...props} className={`${INPUT_CLS} ${props.className || ""}`} />;
+}
+
+export function Textarea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  return <textarea {...props} className={`${INPUT_CLS} ${props.className || ""}`} />;
+}
+
+export function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
+  return <select {...props} className={`${INPUT_CLS} ${props.className || ""}`} />;
+}
+
+/* ---------- ConfirmDialog ---------- */
+
+export function ConfirmDialog({
+  open,
+  title,
+  description,
+  confirmLabel = "确认",
+  danger,
+  onConfirm,
+  onClose,
+}: {
+  open: boolean;
+  title: string;
+  description?: string;
+  confirmLabel?: string;
+  danger?: boolean;
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  if (!open) return null;
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-5"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 className="text-base font-semibold text-slate-900">{title}</h3>
+        {description && <p className="mt-1.5 text-sm leading-6 text-slate-600">{description}</p>}
+        <div className="mt-5 flex justify-end gap-2">
+          <Button variant="secondary" size="sm" onClick={onClose}>
+            取消
+          </Button>
+          <Button
+            variant={danger ? "danger" : "primary"}
+            size="sm"
+            onClick={() => {
+              onConfirm();
+              onClose();
+            }}
+          >
+            {confirmLabel}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- EmptyState / Skeleton ---------- */
+
+export function EmptyState({
+  title,
+  description,
+  action,
+}: {
+  title: string;
+  description?: string;
+  action?: ReactNode;
+}) {
+  return (
+    <div className="flex flex-col items-center px-6 py-14 text-center">
+      <span className="mb-4 flex h-11 w-11 items-center justify-center rounded-full bg-brand-50">
+        <span className="h-2.5 w-2.5 rounded-full bg-brand-500" />
+      </span>
+      <p className="text-sm font-medium text-slate-900">{title}</p>
+      {description && <p className="mt-1 max-w-sm text-sm text-slate-500">{description}</p>}
+      {action && <div className="mt-4">{action}</div>}
+    </div>
+  );
+}
+
+export function Skeleton({ rows = 4 }: { rows?: number }) {
+  return (
+    <div className="animate-pulse space-y-3 p-4">
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} className="flex items-center gap-3">
+          <div className="h-9 w-9 shrink-0 rounded-lg bg-slate-100" />
+          <div className="flex-1 space-y-2">
+            <div className="h-3 w-2/5 rounded bg-slate-100" />
+            <div className="h-2.5 w-3/5 rounded bg-slate-100" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ---------- PageHeader ---------- */
+
+export function PageHeader({
+  title,
+  desc,
+  actions,
+}: {
+  title: string;
+  desc?: string;
+  actions?: ReactNode;
+}) {
+  return (
+    <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <h1 className="text-xl font-semibold tracking-tight text-slate-900">{title}</h1>
+        {desc && <p className="mt-1 text-sm text-slate-500">{desc}</p>}
+      </div>
+      <div className="flex items-center gap-2">{actions}</div>
+    </div>
+  );
+}
+
+/* ---------- StatusBadge / RunTimeline ---------- */
 
 const STATUS_STYLE: Record<string, string> = {
   pending: "bg-slate-100 text-slate-500",
-  running: "bg-blue-100 text-blue-700",
+  running: "bg-brand-100 text-brand-700",
   waiting_approval: "bg-amber-100 text-amber-700",
   succeeded: "bg-green-100 text-green-700",
   failed: "bg-red-100 text-red-700",
@@ -48,27 +267,45 @@ export interface StepRow {
   finished_at: string | null;
 }
 
+const STEP_DOT: Record<string, string> = {
+  running: "#7C3AED",
+  waiting_approval: "#D97706",
+  succeeded: "#16A34A",
+  failed: "#DC2626",
+  rejected: "#DC2626",
+  pending: "#CBD5E1",
+  queued: "#CBD5E1",
+  skipped: "#CBD5E1",
+  cancelled: "#CBD5E1",
+};
+
 export function RunTimeline({ steps }: { steps: StepRow[] }) {
-  if (steps.length === 0) return <p className="text-sm text-slate-400">暂无节点执行记录</p>;
+  if (steps.length === 0)
+    return <p className="text-sm text-slate-400">暂无节点执行记录</p>;
   return (
-    <ol className="relative space-y-3 border-l-2 border-slate-200 pl-5">
+    <ol className="relative space-y-3 border-l-2 border-slate-100 pl-6">
       {steps.map((s) => (
         <li key={s.id} className="relative">
-          <span className="absolute -left-[27px] top-1 h-3 w-3 rounded-full border-2 border-white bg-slate-300 shadow" />
-          <div className="card p-3">
-            <div className="mb-1 flex flex-wrap items-center gap-2">
-              <span className="font-mono text-xs text-slate-400">{s.node_id}</span>
-              <span className="text-sm font-medium">{s.node_name || s.node_type}</span>
+          <span
+            className="absolute -left-[31px] top-4 h-3 w-3 rounded-full border-2 border-white"
+            style={{ background: STEP_DOT[s.status] || "#CBD5E1" }}
+          />
+          <div className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-sm">
+            <div className="mb-1.5 flex flex-wrap items-center gap-2">
+              <span className="text-sm font-medium text-slate-900">{s.node_name || s.node_type}</span>
+              <span className="font-mono text-[11px] text-slate-400">{s.node_id}</span>
               <StatusBadge status={s.status} />
             </div>
-            <div className="flex flex-wrap gap-3 text-[11px] text-slate-400">
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-400">
               {s.duration_ms != null && <span>耗时 {(s.duration_ms / 1000).toFixed(1)}s</span>}
               {s.tokens > 0 && <span>{s.tokens} tokens</span>}
               {Number(s.cost_usd) > 0 && <span>${Number(s.cost_usd).toFixed(5)}</span>}
               {s.started_at && <span>{new Date(s.started_at).toLocaleTimeString()}</span>}
             </div>
             {s.error && (
-              <p className="mt-2 rounded bg-red-50 p-2 font-mono text-xs text-red-600">{s.error}</p>
+              <p className="mt-2 rounded-lg bg-red-50 p-2.5 font-mono text-xs leading-5 text-red-600">
+                {s.error}
+              </p>
             )}
           </div>
         </li>
@@ -81,22 +318,10 @@ export function JsonBlock({ title, data }: { title: string; data: unknown }) {
   if (data === null || data === undefined) return null;
   return (
     <div className="mb-4">
-      <h4 className="mb-1 text-xs font-semibold text-slate-500">{title}</h4>
-      <pre className="max-h-72 overflow-auto rounded-lg bg-slate-900 p-3 font-mono text-xs text-slate-100">
+      <h4 className="mb-1.5 text-xs font-semibold text-slate-500">{title}</h4>
+      <pre className="max-h-72 overflow-auto rounded-xl bg-slate-900 p-3.5 font-mono text-xs leading-5 text-slate-100">
         {JSON.stringify(data, null, 2)}
       </pre>
-    </div>
-  );
-}
-
-export function PageHeader({ title, desc, actions }: { title: string; desc?: string; actions?: ReactNode }) {
-  return (
-    <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-      <div>
-        <h1 className="text-xl font-bold">{title}</h1>
-        {desc && <p className="mt-1 text-sm text-slate-500">{desc}</p>}
-      </div>
-      <div className="flex gap-2">{actions}</div>
     </div>
   );
 }

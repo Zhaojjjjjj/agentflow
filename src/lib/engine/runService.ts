@@ -5,6 +5,7 @@ import { executeGraph, RejectedError } from "./executor";
 import { makeSyncRunner } from "./runners";
 import { SupabaseTraceWriter } from "./trace";
 import type { WorkflowDefinition } from "./types";
+import { findCycle } from "./types";
 
 export type RunMode = "async" | "sync";
 
@@ -26,6 +27,10 @@ export async function createRun(opts: {
   const definition = wf.definition as WorkflowDefinition;
   if (!definition.nodes || definition.nodes.length === 0) {
     throw new Error("工作流没有任何节点");
+  }
+  const cycle = findCycle(definition);
+  if (cycle) {
+    throw new Error(`工作流存在循环依赖，无法执行：${cycle.join(" → ")}`);
   }
 
   const { data: run, error: rerr } = await sb

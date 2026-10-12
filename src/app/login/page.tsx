@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
+import { Button, Field, Input } from "@/components/ui";
 
 /** Only allow same-origin relative redirects (prevents open-redirect). */
 function safeNext(raw: string | null): string {
@@ -42,39 +43,43 @@ function LoginForm() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
-      <div className="card w-full max-w-sm p-8">
-        <h1 className="text-xl font-semibold">agentflow</h1>
-        <p className="mt-1 text-sm text-slate-500">控制台登录</p>
+    <div className="flex min-h-screen items-center justify-center bg-white px-4">
+      <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+        <div className="flex items-center gap-2.5">
+          <span className="h-3 w-3 rounded-full bg-brand-600" />
+          <h1 className="text-xl font-semibold tracking-tight text-slate-900">agentflow</h1>
+        </div>
+        <p className="mt-1.5 text-sm text-slate-500">控制台登录</p>
         <form onSubmit={submit} className="mt-6 space-y-4">
-          <div>
-            <label className="mb-1 block text-sm text-slate-600">用户名</label>
-            <input
-              className="input"
+          <Field label="用户名">
+            <Input
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               placeholder="请输入用户名"
               autoFocus
               autoComplete="username"
             />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm text-slate-600">密码</label>
-            <input
+          </Field>
+          <Field label="密码">
+            <Input
               type="password"
-              className="input"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="请输入密码"
               autoComplete="current-password"
             />
-          </div>
+          </Field>
           {error && (
-            <p className="rounded bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
+            <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
           )}
-          <button type="submit" className="btn-primary w-full" disabled={loading || !username || !password}>
+          <Button
+            type="submit"
+            variant="primary"
+            className="w-full"
+            disabled={loading || !username || !password}
+          >
             {loading ? "登录中…" : "登录"}
-          </button>
+          </Button>
         </form>
       </div>
     </div>

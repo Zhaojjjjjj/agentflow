@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { PageHeader, StatusBadge, RunTimeline, JsonBlock, type StepRow } from "@/components/ui";
+import Link from "next/link";
+import TopNav from "@/components/TopNav";
+import { PageHeader, StatusBadge, RunTimeline, JsonBlock, Badge, Button, Textarea, type StepRow } from "@/components/ui";
+import { toast } from "@/components/toast";
 
 interface RunDetail {
   id: string;
@@ -17,16 +20,26 @@ interface RunDetail {
   finished_at: string | null;
 }
 
-export default function RunDetailPage({ params }: { params: Promise<{ id: string }> }) {
+function StatCard({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="card flex-1 p-4">
+      <p className="mb-1.5 text-xs text-slate-400">{label}</p>
+      <div>{children}</div>
+    </div>
+  );
+}
+
+export default function RunDetailPage({ params }: { params: Promise<{ runId: string }> }) {
   const [runId, setRunId] = useState("");
   const [run, setRun] = useState<RunDetail | null>(null);
   const [steps, setSteps] = useState<StepRow[]>([]);
   const [comment, setComment] = useState("");
   const [busy, setBusy] = useState(false);
+  const [sseDead, setSseDead] = useState(false);
   const esRef = useRef<EventSource | null>(null);
 
   useEffect(() => {
-    void params.then((p) => setRunId(p.id));
+    void params.then((p) => setRunId(p.runId));
   }, [params]);
 
   useEffect(() => {
@@ -55,8 +68,9 @@ export default function RunDetailPage({ params }: { params: Promise<{ id: string
       }
     };
     es.onerror = () => {
-      // SSE 出错时回退为一次性加载
+      // SSE 断开后回退为最后已知状态
       es.close();
+      if (!stopped) setSseDead(true);
     };
     return () => {
       stopped = true;
@@ -73,7 +87,12 @@ export default function RunDetailPage({ params }: { params: Promise<{ id: string
         body: JSON.stringify({ decision, comment }),
       });
       const j = await res.json();
-      if (!res.ok) alert(j.error || "操作失败");
+      if (!res.ok) {
+        toast.error(j.error || "操作失败");
+      } else {
+        toast.success(decision === "approved" ? "已批准，继续执行" : "已拒绝，流程终止");
+        setComment("");
+      }
     } finally {
       setBusy(false);
     }
@@ -82,60 +101,89 @@ export default function RunDetailPage({ params }: { params: Promise<{ id: string
   const waiting = steps.some((s) => s.status === "waiting_approval");
 
   return (
-    <div className="mx-auto max-w-4xl px-6 py-8">
-      <PageHeader
-        title="运行详情"
-        desc={runId ? `run ${runId.slice(0, 8)}` : ""}
-        actions={
-          run?.workflow_id ? (
-            <a className="btn-secondary" href={`/workflows/${run.workflow_id}/runs`}>返回历史</a>
-          ) : undefined
-        }
-      />
+    <>
+      <TopNav />
+      <div className="mx-auto max-w-4xl px-6 py-8">
+        <PageHeader
+          title="运行详情"
+          desc={runId ? `run ${runId.slice(0, 8)}` : ""}
+          actions={
+            run?.workflow_id ? (
+              <Link
+                href={`/workflows/${run.workflow_id}/runs`}
+                className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 transition-colors duration-150 hover:bg-slate-100"
+              >
+                返回历史
+              </Link>
+            ) : undefined
+          }
+        />
 
-      {run && (
-        <div className="card mb-5 flex flex-wrap items-center gap-3 p-4">
-          <StatusBadge status={run.status} />
-          <span className="badge bg-slate-100 text-slate-500">{run.trigger}</span>
-          <span className="text-sm text-slate-500">
-            {run.total_tokens} tokens · 预估 ${Number(run.estimated_cost_usd).toFixed(5)}
-          </span>
-          {run.error && <span className="text-sm text-red-600">{run.error}</span>}
+        {sseDead && (
+          <p className="mb-4 rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs text-slate-500">
+            实时连接已断开，显示最后已知状态
+          </p>
+        )}
+
+        <div className="mb-5 flex flex-wrap gap-3">
+          <StatCard label="状态">
+            <div className="flex items-center gap-2">
+              {run ? <StatusBadge status={run.status} /> : <span className="text-sm text-slate-400">加载中…</span>}
+              {run && <Badge tone="gray">{run.trigger}</Badge>}
+            </div>
+          </StatCard>
+          <StatCard label="Token 消耗">
+            <span className="text-lg font-semibold text-slate-900">{run?.total_tokens ?? "—"}</span>
+          </StatCard>
+          <StatCard label="预估成本">
+            <span className="text-lg font-semibold text-slate-900">
+              {run ? `$${Number(run.estimated_cost_usd).toFixed(5)}` : "—"}
+            </span>
+          </StatCard>
         </div>
-      )}
 
-      {waiting && (
-        <div className="card mb-5 border-amber-300 bg-amber-50 p-4">
-          <h3 className="mb-2 font-semibold text-amber-800">等待人工审批</h3>
-          <textarea
-            className="input mb-3"
-            rows={2}
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            placeholder="审批意见（可选）"
-          />
-          <div className="flex gap-2">
-            <button className="btn-primary" disabled={busy} onClick={() => approve("approved")}>
-              ✓ 批准继续
-            </button>
-            <button className="btn-danger" disabled={busy} onClick={() => approve("rejected")}>
-              ✕ 拒绝终止
-            </button>
+        {run?.error && (
+          <p className="mb-5 rounded-xl bg-red-50 p-3.5 font-mono text-xs leading-5 text-red-600">
+            {run.error}
+          </p>
+        )}
+
+        {waiting && (
+          <div className="card mb-5 border-amber-200 bg-amber-50 p-5">
+            <div className="mb-3 flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-amber-500" />
+              <h3 className="font-semibold text-amber-800">等待人工审批</h3>
+            </div>
+            <Textarea
+              rows={2}
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              placeholder="审批意见（可选）"
+              className="mb-3"
+            />
+            <div className="flex gap-2">
+              <Button variant="primary" disabled={busy} onClick={() => approve("approved")}>
+                批准继续
+              </Button>
+              <Button variant="danger" disabled={busy} onClick={() => approve("rejected")}>
+                拒绝终止
+              </Button>
+            </div>
           </div>
+        )}
+
+        <div className="mb-6">
+          <h3 className="mb-3 text-sm font-semibold text-slate-700">节点执行时间线</h3>
+          <RunTimeline steps={steps} />
         </div>
-      )}
 
-      <div className="mb-6">
-        <h3 className="mb-3 text-sm font-semibold text-slate-500">节点执行时间线</h3>
-        <RunTimeline steps={steps} />
+        {run && (
+          <>
+            <JsonBlock title="输入 input" data={run.input} />
+            <JsonBlock title="输出 output" data={run.output} />
+          </>
+        )}
       </div>
-
-      {run && (
-        <>
-          <JsonBlock title="输入 input" data={run.input} />
-          <JsonBlock title="输出 output" data={run.output} />
-        </>
-      )}
-    </div>
+    </>
   );
 }

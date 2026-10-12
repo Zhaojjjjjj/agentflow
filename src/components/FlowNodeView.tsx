@@ -14,18 +14,22 @@ export default function FlowNodeView({ data, selected }: NodeProps<AgentNode>) {
 
   return (
     <div
-      className={`min-w-[170px] max-w-[220px] rounded-xl border-2 bg-white shadow-sm transition-shadow ${
-        selected ? "border-brand-500 shadow-md" : "border-slate-200"
+      className={`min-w-[170px] max-w-[220px] rounded-xl border bg-white shadow-sm transition-shadow duration-150 ${
+        selected ? "border-brand-500 ring-2 ring-brand-100" : "border-slate-200"
       }`}
     >
       {!isTrigger && <Handle type="target" position={Position.Left} style={HANDLE_STYLE} />}
-      <div
-        className="flex items-center gap-2 rounded-t-[10px] px-3 py-2 text-[13px] font-semibold text-white"
-        style={{ background: meta.color }}
-      >
-        <span className="truncate">{data.label || meta.label}</span>
+      <div className="flex items-center gap-2 px-3 pt-2.5">
+        <span
+          className="h-2 w-2 shrink-0 rounded-full"
+          style={{ background: meta.color }}
+          title={meta.category}
+        />
+        <span className="truncate text-[13px] font-semibold text-slate-900">
+          {data.label || meta.label}
+        </span>
       </div>
-      <div className="px-3 py-1.5 text-[11px] text-slate-500">{meta.label}</div>
+      <div className="px-3 pb-2.5 pt-1 text-[11px] text-slate-400">{meta.label}</div>
       {!isOutput && !isCondition && (
         <Handle type="source" position={Position.Right} style={HANDLE_STYLE} />
       )}
@@ -43,7 +47,7 @@ export default function FlowNodeView({ data, selected }: NodeProps<AgentNode>) {
             id="false"
             style={{ ...HANDLE_STYLE, top: "72%", background: "#dc2626" }}
           />
-          <div className="flex justify-between px-3 pb-2 text-[10px] font-medium">
+          <div className="flex justify-between px-3 pb-2.5 text-[10px] font-medium">
             <span className="text-green-600">true →</span>
             <span className="text-red-600">false →</span>
           </div>

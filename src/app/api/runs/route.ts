@@ -3,6 +3,8 @@ import { getSupabase } from "@/lib/supabase";
 import { createRun, type RunMode } from "@/lib/engine/runService";
 
 export const dynamic = "force-dynamic";
+// Sync mode executes the whole graph inline — give it headroom on Vercel.
+export const maxDuration = 60;
 
 export async function GET(req: NextRequest) {
   const sb = getSupabase();

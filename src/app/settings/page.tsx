@@ -1,9 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { PageHeader } from "@/components/ui";
-import LogoutButton from "@/components/LogoutButton";
+import TopNav from "@/components/TopNav";
 import Modal from "@/components/Modal";
+import {
+  PageHeader,
+  Button,
+  Badge,
+  Field,
+  Input,
+  Select,
+  EmptyState,
+  Skeleton,
+  ConfirmDialog,
+} from "@/components/ui";
+import { toast } from "@/components/toast";
 
 interface Provider {
   id: string;
@@ -49,10 +60,11 @@ export default function SettingsPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm("chat"));
   const [saving, setSaving] = useState(false);
-  const [formError, setFormError] = useState("");
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [testing, setTesting] = useState<string | null>(null);
   const [testResults, setTestResults] = useState<Record<string, { ok: boolean; msg: string }>>({});
-  const [notice, setNotice] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<Provider | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -61,9 +73,9 @@ export default function SettingsPage() {
       if (j.providers) setProviders(j.providers);
       setEncryptionReady(j.encryptionReady !== false);
       setEnvCount(j.envProviderCount || 0);
-      if (j.error) setNotice(j.error);
+      if (j.error) toast.error(j.error);
     } catch (e) {
-      setNotice(`加载失败：${e instanceof Error ? e.message : String(e)}`);
+      toast.error(`加载失败：${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setLoading(false);
     }
@@ -76,7 +88,7 @@ export default function SettingsPage() {
 
   const openCreate = (kind: "chat" | "embedding") => {
     setForm(emptyForm(kind));
-    setFormError("");
+    setFormErrors({});
     setModalOpen(true);
   };
 
@@ -92,20 +104,26 @@ export default function SettingsPage() {
       priority: String(p.priority),
       enabled: p.enabled,
     });
-    setFormError("");
+    setFormErrors({});
     setModalOpen(true);
   };
 
+  const validate = (): boolean => {
+    const errs: Record<string, string> = {};
+    const isEdit = Boolean(form.id);
+    if (!form.name.trim()) errs.name = "名称不能为空";
+    if (!form.baseUrl.trim()) errs.baseUrl = "Base URL 不能为空";
+    if (!form.model.trim()) errs.model = "模型不能为空";
+    if (!isEdit && !form.apiKey.trim()) errs.apiKey = "API Key 不能为空";
+    setFormErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
   const save = async () => {
+    if (!validate()) return;
     setSaving(true);
-    setFormError("");
     try {
       const isEdit = Boolean(form.id);
-      if (!isEdit && !form.apiKey.trim()) {
-        setFormError("API Key 不能为空");
-        setSaving(false);
-        return;
-      }
       const body = {
         id: form.id,
         name: form.name.trim(),
@@ -124,12 +142,11 @@ export default function SettingsPage() {
       });
       const j = await res.json();
       if (!res.ok) {
-        setFormError(j.error || "保存失败");
-        setSaving(false);
+        toast.error(j.error || "保存失败");
         return;
       }
       setModalOpen(false);
-      setNotice(isEdit ? "已更新" : "已添加");
+      toast.success(isEdit ? "已更新" : "已添加");
       await load();
     } finally {
       setSaving(false);
@@ -137,9 +154,14 @@ export default function SettingsPage() {
   };
 
   const remove = async (p: Provider) => {
-    if (!confirm(`删除供应商「${p.name}」？`)) return;
-    await fetch(`/api/settings/providers/${p.id}`, { method: "DELETE" });
-    await load();
+    try {
+      const res = await fetch(`/api/settings/providers/${p.id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("删除失败");
+      toast.success("已删除");
+      await load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e));
+    }
   };
 
   const toggleEnabled = async (p: Provider) => {
@@ -193,167 +215,231 @@ export default function SettingsPage() {
   };
 
   const importEnv = async () => {
-    if (!confirm(`将环境变量中的 ${envCount} 个供应商导入数据库？（同名会跳过）`)) return;
     const res = await fetch("/api/settings/providers/import", { method: "POST" });
     const j = await res.json();
     if (!res.ok) {
-      setNotice(`导入失败：${j.error}`);
+      toast.error(`导入失败：${j.error}`);
       return;
     }
-    setNotice(`导入完成：新增 ${j.imported.length} 个，跳过 ${j.skipped.length} 个`);
+    toast.success(`导入完成：新增 ${j.imported.length} 个，跳过 ${j.skipped.length} 个`);
     await load();
   };
 
-  const group = (kind: "chat" | "embedding") =>
-    providers.filter((p) => p.kind === kind);
+  const group = (kind: "chat" | "embedding") => providers.filter((p) => p.kind === kind);
 
   const renderGroup = (kind: "chat" | "embedding", title: string, desc: string) => {
     const rows = group(kind);
     return (
-      <div className="mb-8">
+      <section className="mb-8">
         <div className="mb-3 flex items-center justify-between">
           <div>
-            <h2 className="text-base font-semibold">{title}</h2>
-            <p className="text-xs text-slate-400">{desc}</p>
+            <h2 className="text-[15px] font-semibold text-slate-900">{title}</h2>
+            <p className="mt-0.5 text-xs text-slate-400">{desc}</p>
           </div>
-          <button className="btn-primary" onClick={() => openCreate(kind)}>+ 添加</button>
+          <Button variant="primary" size="sm" onClick={() => openCreate(kind)}>
+            添加
+          </Button>
         </div>
-        <div className="card divide-y divide-slate-100">
-          {rows.map((p) => (
-            <div key={p.id} className={`flex flex-wrap items-center gap-3 px-4 py-3 ${p.enabled ? "" : "opacity-50"}`}>
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-medium">{p.name}</span>
-                  <span className="badge bg-slate-100 text-slate-500">{p.model}</span>
-                  <span className={`badge ${p.enabled ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-400"}`}>
-                    {p.enabled ? "启用" : "禁用"}
-                  </span>
-                  {testResults[p.id] && (
-                    <span className={`badge ${testResults[p.id].ok ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
-                      {testResults[p.id].msg}
-                    </span>
-                  )}
+        <div className="card overflow-hidden">
+          {rows.length === 0 ? (
+            <EmptyState
+              title={`暂无${kind === "chat" ? "对话" : "向量"}供应商`}
+              description={kind === "chat" ? "添加后将优先于环境变量配置" : undefined}
+            />
+          ) : (
+            <div className="divide-y divide-slate-100">
+              {rows.map((p) => (
+                <div
+                  key={p.id}
+                  className={`flex flex-wrap items-center gap-3 px-4 py-3.5 ${p.enabled ? "" : "opacity-50"}`}
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-medium text-slate-900">{p.name}</span>
+                      <Badge tone="gray">{p.model}</Badge>
+                      <Badge tone={p.enabled ? "green" : "gray"}>{p.enabled ? "启用" : "禁用"}</Badge>
+                      {testResults[p.id] && (
+                        <Badge tone={testResults[p.id].ok ? "green" : "red"}>
+                          {testResults[p.id].msg}
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="mt-1 truncate font-mono text-xs text-slate-400">
+                      {p.base_url} · Key {p.key_mask} · 优先级 {p.priority}
+                      {p.kind === "embedding" && ` · 维度 ${p.dimensions ?? 1536}`}
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <Button size="sm" variant="secondary" disabled={testing === p.id} onClick={() => test(p)}>
+                      {testing === p.id ? "测试中…" : "测试连接"}
+                    </Button>
+                    <Button size="sm" variant="secondary" onClick={() => move(p, "up")} title="上移（优先级更高）">
+                      ↑
+                    </Button>
+                    <Button size="sm" variant="secondary" onClick={() => move(p, "down")} title="下移">
+                      ↓
+                    </Button>
+                    <Button size="sm" variant="secondary" onClick={() => toggleEnabled(p)}>
+                      {p.enabled ? "禁用" : "启用"}
+                    </Button>
+                    <Button size="sm" variant="secondary" onClick={() => openEdit(p)}>
+                      编辑
+                    </Button>
+                    <Button size="sm" variant="danger" onClick={() => setDeleteTarget(p)}>
+                      删除
+                    </Button>
+                  </div>
                 </div>
-                <div className="mt-1 truncate font-mono text-xs text-slate-400">
-                  {p.base_url} · Key {p.key_mask} · 优先级 {p.priority}
-                  {p.kind === "embedding" && ` · 维度 ${p.dimensions ?? 1536}`}
-                </div>
-              </div>
-              <div className="flex flex-wrap items-center gap-1.5">
-                <button className="btn-secondary !px-2.5 !py-1 text-xs" disabled={testing === p.id} onClick={() => test(p)}>
-                  {testing === p.id ? "测试中…" : "测试连接"}
-                </button>
-                <button className="btn-secondary !px-2.5 !py-1 text-xs" onClick={() => move(p, "up")} title="上移（优先级更高）">↑</button>
-                <button className="btn-secondary !px-2.5 !py-1 text-xs" onClick={() => move(p, "down")} title="下移">↓</button>
-                <button className="btn-secondary !px-2.5 !py-1 text-xs" onClick={() => toggleEnabled(p)}>
-                  {p.enabled ? "禁用" : "启用"}
-                </button>
-                <button className="btn-secondary !px-2.5 !py-1 text-xs" onClick={() => openEdit(p)}>编辑</button>
-                <button className="btn-danger !px-2.5 !py-1 text-xs" onClick={() => remove(p)}>删除</button>
-              </div>
+              ))}
             </div>
-          ))}
-          {rows.length === 0 && (
-            <p className="px-4 py-10 text-center text-sm text-slate-400">
-              暂无{kind === "chat" ? "对话" : "向量"}供应商{kind === "chat" ? "（将回退到环境变量配置）" : ""}
-            </p>
           )}
         </div>
-      </div>
+      </section>
     );
   };
 
   return (
-    <div className="mx-auto max-w-4xl px-6 py-8">
-      <PageHeader
-        title="LLM 供应商"
-        desc="在后台管理对话与向量供应商，Key 经 AES-256-GCM 加密后入库，页面永不回显明文"
-        actions={
-          <>
-            {envCount > 0 && (
-              <button className="btn-secondary" onClick={importEnv}>
+    <>
+      <TopNav />
+      <div className="mx-auto max-w-4xl px-6 py-8">
+        <PageHeader
+          title="LLM 供应商"
+          desc="在后台管理对话与向量供应商，Key 经 AES-256-GCM 加密后入库，页面永不回显明文"
+          actions={
+            envCount > 0 ? (
+              <Button variant="secondary" onClick={() => setImportOpen(true)}>
                 从环境变量导入（{envCount}）
-              </button>
-            )}
-            <a className="btn-secondary" href="/">返回首页</a>
-            <LogoutButton />
+              </Button>
+            ) : undefined
+          }
+        />
+
+        {!encryptionReady && (
+          <div className="card mb-6 border-red-200 bg-red-50 p-4 text-sm leading-6 text-red-700">
+            未检测到有效的 <code className="font-mono">APP_ENCRYPTION_KEY</code>（64 位 hex）。
+            新增 / 更新供应商会被拒绝。请在 Vercel 环境变量中配置后重新部署，
+            生成命令：<code className="font-mono">openssl rand -hex 32</code>
+          </div>
+        )}
+
+        {loading ? (
+          <div className="card">
+            <Skeleton rows={5} />
+          </div>
+        ) : (
+          <>
+            {renderGroup("chat", "对话供应商", "按优先级从上到下依次试错，全部失败才报错")}
+            {renderGroup("embedding", "向量供应商（RAG）", "仅优先级最高的启用项生效；维度须与 documents 表的向量维度一致（默认 1536）")}
           </>
-        }
-      />
-
-      {!encryptionReady && (
-        <div className="card mb-6 border-red-300 bg-red-50 p-4 text-sm text-red-700">
-          未检测到有效的 <code className="font-mono">APP_ENCRYPTION_KEY</code>（64 位 hex）。
-          新增 / 更新供应商会被拒绝。请在 Vercel 环境变量中配置后重新部署，
-          生成命令：<code className="font-mono">openssl rand -hex 32</code>
-        </div>
-      )}
-
-      {notice && (
-        <div className="card mb-6 border-blue-200 bg-blue-50 p-3 text-sm text-blue-700">
-          {notice} <button className="ml-2 underline" onClick={() => setNotice("")}>关闭</button>
-        </div>
-      )}
-
-      {loading ? (
-        <p className="py-10 text-center text-sm text-slate-400">加载中…</p>
-      ) : (
-        <>
-          {renderGroup("chat", "对话供应商", "按优先级从上到下依次试错，全部失败才报错")}
-          {renderGroup("embedding", "向量供应商（RAG）", "仅优先级最高的启用项生效；维度须与 documents 表的向量维度一致（默认 1536）")}
-        </>
-      )}
+        )}
+      </div>
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={form.id ? "编辑供应商" : "添加供应商"}>
-        {formError && <p className="mb-3 rounded bg-red-50 p-2 text-sm text-red-600">{formError}</p>}
-        <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <label className="block">
-              <span className="mb-1 block text-xs text-slate-500">名称</span>
-              <input className="input w-full" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="如 deepseek" />
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-xs text-slate-500">类型</span>
-              <select className="input w-full" value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value as "chat" | "embedding" })} disabled={Boolean(form.id)}>
-                <option value="chat">对话（chat）</option>
-                <option value="embedding">向量（embedding）</option>
-              </select>
-            </label>
-          </div>
-          <label className="block">
-            <span className="mb-1 block text-xs text-slate-500">Base URL</span>
-            <input className="input w-full font-mono" value={form.baseUrl} onChange={(e) => setForm({ ...form, baseUrl: e.target.value })} placeholder="https://api.deepseek.com/v1" />
-          </label>
-          <label className="block">
-            <span className="mb-1 block text-xs text-slate-500">API Key {form.id && <span className="text-slate-400">（留空则不修改）</span>}</span>
-            <input className="input w-full font-mono" type="password" value={form.apiKey} onChange={(e) => setForm({ ...form, apiKey: e.target.value })} placeholder={form.id ? "••••" : "sk-..."} />
-          </label>
-          <div className="grid grid-cols-3 gap-3">
-            <label className="block">
-              <span className="mb-1 block text-xs text-slate-500">模型</span>
-              <input className="input w-full font-mono" value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })} placeholder="deepseek-chat" />
-            </label>
-            {form.kind === "embedding" && (
-              <label className="block">
-                <span className="mb-1 block text-xs text-slate-500">维度</span>
-                <input className="input w-full" value={form.dimensions} onChange={(e) => setForm({ ...form, dimensions: e.target.value })} placeholder="1536" />
-              </label>
-            )}
-            <label className="block">
-              <span className="mb-1 block text-xs text-slate-500">优先级（越小越先）</span>
-              <input className="input w-full" value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })} placeholder="0" />
-            </label>
-          </div>
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={form.enabled} onChange={(e) => setForm({ ...form, enabled: e.target.checked })} />
-            启用
-          </label>
-          <div className="flex justify-end gap-2 pt-2">
-            <button className="btn-secondary" onClick={() => setModalOpen(false)}>取消</button>
-            <button className="btn-primary" disabled={saving} onClick={save}>{saving ? "保存中…" : "保存"}</button>
-          </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="名称" required error={formErrors.name}>
+            <Input
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              placeholder="如 deepseek"
+            />
+          </Field>
+          <Field label="类型">
+            <Select
+              value={form.kind}
+              onChange={(e) => setForm({ ...form, kind: e.target.value as "chat" | "embedding" })}
+              disabled={Boolean(form.id)}
+            >
+              <option value="chat">对话（chat）</option>
+              <option value="embedding">向量（embedding）</option>
+            </Select>
+          </Field>
+        </div>
+        <Field label="Base URL" required error={formErrors.baseUrl}>
+          <Input
+            className="font-mono"
+            value={form.baseUrl}
+            onChange={(e) => setForm({ ...form, baseUrl: e.target.value })}
+            placeholder="https://api.deepseek.com/v1"
+          />
+        </Field>
+        <Field
+          label={`API Key${form.id ? "（留空则不修改）" : ""}`}
+          required={!form.id}
+          error={formErrors.apiKey}
+        >
+          <Input
+            type="password"
+            className="font-mono"
+            value={form.apiKey}
+            onChange={(e) => setForm({ ...form, apiKey: e.target.value })}
+            placeholder={form.id ? "••••" : "sk-..."}
+          />
+        </Field>
+        <div className="grid grid-cols-3 gap-3">
+          <Field label="模型" required error={formErrors.model}>
+            <Input
+              className="font-mono"
+              value={form.model}
+              onChange={(e) => setForm({ ...form, model: e.target.value })}
+              placeholder="deepseek-chat"
+            />
+          </Field>
+          {form.kind === "embedding" && (
+            <Field label="维度">
+              <Input
+                value={form.dimensions}
+                onChange={(e) => setForm({ ...form, dimensions: e.target.value })}
+                placeholder="1536"
+              />
+            </Field>
+          )}
+          <Field label="优先级（越小越先）">
+            <Input
+              value={form.priority}
+              onChange={(e) => setForm({ ...form, priority: e.target.value })}
+              placeholder="0"
+            />
+          </Field>
+        </div>
+        <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-700">
+          <input
+            type="checkbox"
+            checked={form.enabled}
+            onChange={(e) => setForm({ ...form, enabled: e.target.checked })}
+            className="h-4 w-4 accent-brand-600"
+          />
+          启用
+        </label>
+        <div className="mt-4 flex justify-end gap-2">
+          <Button variant="secondary" onClick={() => setModalOpen(false)}>
+            取消
+          </Button>
+          <Button variant="primary" disabled={saving} onClick={save}>
+            {saving ? "保存中…" : "保存"}
+          </Button>
         </div>
       </Modal>
-    </div>
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title="删除供应商"
+        description={`确定删除「${deleteTarget?.name || ""}」吗？相关工作流将回退到其他供应商或环境变量配置。`}
+        confirmLabel="删除"
+        danger
+        onConfirm={() => {
+          if (deleteTarget) void remove(deleteTarget);
+        }}
+        onClose={() => setDeleteTarget(null)}
+      />
+
+      <ConfirmDialog
+        open={importOpen}
+        title="从环境变量导入"
+        description={`将环境变量中的 ${envCount} 个供应商导入数据库？（同名会跳过）`}
+        confirmLabel="导入"
+        onConfirm={() => void importEnv()}
+        onClose={() => setImportOpen(false)}
+      />
+    </>
   );
 }
