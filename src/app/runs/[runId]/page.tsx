@@ -45,36 +45,41 @@ export default function RunDetailPage({ params }: { params: Promise<{ runId: str
   useEffect(() => {
     if (!runId) return;
     let stopped = false;
+    const TERMINAL = ["succeeded", "failed", "rejected", "cancelled"];
     const load = async () => {
       const res = await fetch(`/api/runs/${runId}`);
       const j = await res.json();
       if (stopped) return;
       if (j.run) setRun(j.run);
       if (j.steps) setSteps(j.steps);
+      return j.run?.status as string | undefined;
     };
-    void load();
-    const es = new EventSource(`/api/runs/${runId}/stream`);
-    esRef.current = es;
-    es.onmessage = (e) => {
-      try {
-        const j = JSON.parse(e.data);
-        if (j.type === "update" || j.type === "done") {
-          setRun(j.run);
-          setSteps(j.steps || []);
+    void load().then((status) => {
+      // 已结束的运行不需要再开实时流，避免 done 消息冲掉已有数据
+      if (stopped || (status && TERMINAL.includes(status))) return;
+      const es = new EventSource(`/api/runs/${runId}/stream`);
+      esRef.current = es;
+      es.onmessage = (e) => {
+        try {
+          const j = JSON.parse(e.data);
+          if (j.type === "update" || j.type === "done") {
+            setRun(j.run);
+            if (j.steps) setSteps(j.steps);
+          }
+          if (j.type === "done") es.close();
+        } catch {
+          /* ignore */
         }
-        if (j.type === "done") es.close();
-      } catch {
-        /* ignore */
-      }
-    };
-    es.onerror = () => {
-      // SSE 断开后回退为最后已知状态
-      es.close();
-      if (!stopped) setSseDead(true);
-    };
+      };
+      es.onerror = () => {
+        // SSE 断开后回退为最后已知状态
+        es.close();
+        if (!stopped) setSseDead(true);
+      };
+    });
     return () => {
       stopped = true;
-      es.close();
+      esRef.current?.close();
     };
   }, [runId]);
 

@@ -42,7 +42,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
             (run as { status: string }).status
           );
           if (terminal || polls >= maxPolls) {
-            send({ type: "done", run });
+            send({ type: "done", run, steps: steps || [] });
             clearInterval(timer);
             controller.close();
           }
