@@ -459,9 +459,12 @@ export async function executeGraph(args: GraphExecArgs): Promise<{
       let result: NodeResult;
       if (node.type === "human-approval") {
         const cfg = node.data.config || {};
+        // 审批标题/内容先落库，审批人才能在 UI 上看到"在批什么"
+        const approvalTitle = String(cfg.title || label);
+        const approvalMessage = String(interpolate(cfg.message ?? "", ctx) ?? "");
         await trace.stepEnd(traceId, {
           status: "waiting_approval",
-          output: { status: "waiting_for_approval" },
+          output: { status: "waiting_for_approval", title: approvalTitle, message: approvalMessage },
           durationMs: Date.now() - t0,
         });
         await trace.setRunStatus(st.runId, "waiting_approval").catch(() => undefined);
@@ -469,8 +472,8 @@ export async function executeGraph(args: GraphExecArgs): Promise<{
           runId: st.runId,
           nodeId: fullId,
           approvalKey: `${st.runId}:${fullId}`,
-          title: String(cfg.title || label),
-          message: String(interpolate(cfg.message ?? "", ctx) ?? ""),
+          title: approvalTitle,
+          message: approvalMessage,
           timeoutHours: cfg.timeoutHours ? Number(cfg.timeoutHours) : 24,
         });
         await trace.setRunStatus(st.runId, "running").catch(() => undefined);

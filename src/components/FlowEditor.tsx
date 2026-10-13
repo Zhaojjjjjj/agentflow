@@ -22,7 +22,7 @@ import RunDialog from "./RunDialog";
 import RunOutputPanel from "./RunOutputPanel";
 import KnowledgeBase from "./KnowledgeBase";
 import Modal from "./Modal";
-import { Button, Badge, Field, Input, ConfirmDialog } from "./ui";
+import { Button, Badge, Field, Input, ConfirmDialog, Markdown, Textarea } from "./ui";
 import { toast } from "./toast";
 
 const nodeTypes: NodeTypes = { agentNode: FlowNodeView };
@@ -359,6 +359,59 @@ function EditorInner({ workflowId, initialRunId }: { workflowId: string; initial
     if (initialRunId) void viewRun(initialRunId);
   }, [initialRunId, viewRun]);
 
+  /** 画布内审批 */
+  const [approvalOpen, setApprovalOpen] = useState(false);
+  const [approvalBusy, setApprovalBusy] = useState(false);
+  const [approvalComment, setApprovalComment] = useState("");
+  const [approvalInfo, setApprovalInfo] = useState<{
+    title: string;
+    message: string;
+    nodeName: string;
+  } | null>(null);
+
+  const openApproval = async () => {
+    if (!liveRun?.runId) return;
+    setApprovalOpen(true);
+    setApprovalInfo(null);
+    try {
+      const res = await fetch(`/api/runs/${liveRun.runId}`);
+      const j = await res.json();
+      const s = (j.steps || []).find((x: { status: string }) => x.status === "waiting_approval") as
+        | { node_name?: string; output?: unknown }
+        | undefined;
+      const out = (s?.output as { title?: string; message?: string } | null) || {};
+      setApprovalInfo({
+        title: String(out.title || "人工审批"),
+        message: String(out.message || ""),
+        nodeName: String(s?.node_name || ""),
+      });
+    } catch {
+      setApprovalInfo({ title: "人工审批", message: "", nodeName: "" });
+    }
+  };
+
+  const decideApproval = async (decision: "approved" | "rejected") => {
+    if (!liveRun?.runId) return;
+    setApprovalBusy(true);
+    try {
+      const res = await fetch(`/api/runs/${liveRun.runId}/approve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ decision, comment: approvalComment }),
+      });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error || "操作失败");
+      toast.success(decision === "approved" ? "已批准，继续执行" : "已拒绝，流程终止");
+      setApprovalOpen(false);
+      setApprovalComment("");
+      // 审批后 Inngest 恢复执行，SSE 会跟进后续节点状态
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "操作失败");
+    } finally {
+      setApprovalBusy(false);
+    }
+  };
+
   const loadWorkflow = useCallback(async () => {
     const res = await fetch(`/api/workflows/${workflowId}`);
     const j = await res.json();
@@ -660,10 +713,10 @@ function EditorInner({ workflowId, initialRunId }: { workflowId: string; initial
                       等待人工审批{runningNodeName ? ` · ${runningNodeName}` : ""}
                     </span>
                     <button
-                      onClick={() => liveRun.runId && router.push(`/runs/${liveRun.runId}`)}
+                      onClick={() => void openApproval()}
                       className="rounded-full bg-amber-500 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-amber-600"
                     >
-                      去审批
+                      查看审批
                     </button>
                   </>
                 )}
@@ -728,6 +781,50 @@ function EditorInner({ workflowId, initialRunId }: { workflowId: string; initial
         }
       />
       <KnowledgeBase workflowId={workflowId} open={kbOpen} onClose={() => setKbOpen(false)} />
+
+      {/* 画布内审批弹窗 */}
+      <Modal open={approvalOpen} onClose={() => setApprovalOpen(false)} title="人工审批" wide>
+        {!approvalInfo ? (
+          <p className="py-8 text-center text-sm text-slate-400">加载审批内容…</p>
+        ) : (
+          <>
+            <div className="mb-3 flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-amber-400" />
+              <h3 className="text-[15px] font-semibold text-slate-900">{approvalInfo.title}</h3>
+              {approvalInfo.nodeName && (
+                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-500">
+                  {approvalInfo.nodeName}
+                </span>
+              )}
+            </div>
+            {approvalInfo.message ? (
+              <div className="mb-4 max-h-80 overflow-y-auto rounded-xl border border-amber-200/60 bg-amber-50/50 px-4 py-3">
+                <Markdown text={approvalInfo.message} />
+              </div>
+            ) : (
+              <p className="mb-4 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-[13px] text-slate-400">
+                该审批节点没有填写说明内容
+              </p>
+            )}
+            <Field label="审批意见（可选，会传递给下游节点）">
+              <Textarea
+                rows={2}
+                value={approvalComment}
+                onChange={(e) => setApprovalComment(e.target.value)}
+                placeholder="例如：再短一点，突出价格优势"
+              />
+            </Field>
+            <div className="mt-4 flex justify-end gap-2">
+              <Button variant="danger" disabled={approvalBusy} onClick={() => void decideApproval("rejected")}>
+                {approvalBusy ? "处理中…" : "拒绝终止"}
+              </Button>
+              <Button variant="primary" disabled={approvalBusy} onClick={() => void decideApproval("approved")}>
+                {approvalBusy ? "处理中…" : "批准继续"}
+              </Button>
+            </div>
+          </>
+        )}
+      </Modal>
 
       {/* publish / api info */}
       <Modal open={publishOpen} onClose={() => setPublishOpen(false)} title="发布为 HTTP API" wide>

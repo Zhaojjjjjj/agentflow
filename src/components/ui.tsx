@@ -264,6 +264,7 @@ export interface StepRow {
   cost_usd: number;
   duration_ms: number | null;
   error: string | null;
+  output?: unknown;
   started_at: string | null;
   finished_at: string | null;
 }

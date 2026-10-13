@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import TopNav from "@/components/TopNav";
-import { PageHeader, StatusBadge, RunTimeline, JsonBlock, OutputView, Badge, Button, Textarea, type StepRow } from "@/components/ui";
+import { PageHeader, StatusBadge, RunTimeline, JsonBlock, OutputView, Markdown, Badge, Button, Textarea, type StepRow } from "@/components/ui";
 import { toast } from "@/components/toast";
 
 interface RunDetail {
@@ -103,7 +103,9 @@ export default function RunDetailPage({ params }: { params: Promise<{ runId: str
     }
   };
 
-  const waiting = steps.some((s) => s.status === "waiting_approval");
+  const waitingStep = steps.find((s) => s.status === "waiting_approval");
+  const waiting = !!waitingStep;
+  const waitingOut = (waitingStep?.output as { title?: string; message?: string } | null) || {};
 
   return (
     <>
@@ -165,13 +167,29 @@ export default function RunDetailPage({ params }: { params: Promise<{ runId: str
           <div className="card mb-5 border-amber-200 bg-amber-50 p-5">
             <div className="mb-3 flex items-center gap-2">
               <span className="h-2 w-2 rounded-full bg-amber-500" />
-              <h3 className="font-semibold text-amber-800">等待人工审批</h3>
+              <h3 className="font-semibold text-amber-800">
+                {waitingOut.title || "等待人工审批"}
+              </h3>
+              {waitingStep?.node_name && (
+                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] text-amber-700">
+                  {waitingStep.node_name}
+                </span>
+              )}
             </div>
+            {waitingOut.message ? (
+              <div className="mb-4 max-h-72 overflow-y-auto rounded-xl border border-amber-200/60 bg-white/70 px-4 py-3">
+                <Markdown text={waitingOut.message} />
+              </div>
+            ) : (
+              <p className="mb-4 text-[13px] text-amber-700/70">
+                该审批节点没有填写说明内容，可直接审批。
+              </p>
+            )}
             <Textarea
               rows={2}
               value={comment}
               onChange={(e) => setComment(e.target.value)}
-              placeholder="审批意见（可选）"
+              placeholder="审批意见（可选，会传递给下游节点）"
               className="mb-3"
             />
             <div className="flex gap-2">
