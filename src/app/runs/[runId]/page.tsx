@@ -109,12 +109,20 @@ export default function RunDetailPage({ params }: { params: Promise<{ runId: str
           desc={runId ? `run ${runId.slice(0, 8)}` : ""}
           actions={
             run?.workflow_id ? (
-              <Link
-                href={`/workflows/${run.workflow_id}/runs`}
-                className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 transition-colors duration-150 hover:bg-slate-100"
-              >
-                返回历史
-              </Link>
+              <div className="flex gap-2">
+                <Link
+                  href={`/workflows/${run.workflow_id}?runId=${runId}`}
+                  className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-brand-600 px-3.5 py-2 text-sm font-medium text-white transition-colors duration-150 hover:bg-brand-700"
+                >
+                  在画布中查看
+                </Link>
+                <Link
+                  href={`/workflows/${run.workflow_id}/runs`}
+                  className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 transition-colors duration-150 hover:bg-slate-100"
+                >
+                  返回历史
+                </Link>
+              </div>
             ) : undefined
           }
         />

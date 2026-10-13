@@ -68,7 +68,7 @@ export default function RunsPage({ params }: { params: Promise<{ id: string }> }
               {runs.map((r) => (
                 <Link
                   key={r.id}
-                  href={`/runs/${r.id}`}
+                  href={`/workflows/${workflowId}?runId=${r.id}`}
                   className="flex items-center gap-3 px-4 py-3.5 transition-colors duration-150 hover:bg-slate-50"
                 >
                   <StatusBadge status={r.status} />

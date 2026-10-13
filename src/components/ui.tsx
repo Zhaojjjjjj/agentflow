@@ -350,17 +350,30 @@ export function JsonBlock({ title, data }: { title: string; data: unknown }) {
 
 /** 运行结果的可视化展示：按字段分块，长文本用易读排版而非 raw JSON */
 export function OutputView({ data }: { data: unknown }) {
-  if (data === null || data === undefined) {
+  // 防御：有些旧数据可能把对象存成了 JSON 字符串，先尝试还原
+  let value = data;
+  if (typeof value === "string") {
+    const t = value.trim();
+    if ((t.startsWith("{") && t.endsWith("}")) || (t.startsWith("[") && t.endsWith("]"))) {
+      try {
+        value = JSON.parse(t);
+      } catch {
+        /* 保持原字符串展示 */
+      }
+    }
+  }
+  const data2 = value;
+  if (data2 === null || data2 === undefined) {
     return <p className="py-6 text-center text-sm text-slate-400">暂无输出</p>;
   }
-  if (typeof data !== "object" || Array.isArray(data)) {
+  if (typeof data2 !== "object" || Array.isArray(data2)) {
     return (
       <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-xl border border-slate-200 bg-white p-4 text-sm leading-7 text-slate-800">
-        {typeof data === "string" ? data : JSON.stringify(data, null, 2)}
+        {typeof data2 === "string" ? data2 : JSON.stringify(data2, null, 2)}
       </pre>
     );
   }
-  const entries = Object.entries(data as Record<string, unknown>);
+  const entries = Object.entries(data2 as Record<string, unknown>);
   if (entries.length === 0) {
     return <p className="py-6 text-center text-sm text-slate-400">暂无输出</p>;
   }

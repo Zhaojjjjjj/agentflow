@@ -19,6 +19,7 @@ import { useEditorStore } from "@/store/editorStore";
 import FlowNodeView from "./FlowNodeView";
 import NodeConfigPanel from "./NodeConfigPanel";
 import RunDialog from "./RunDialog";
+import RunOutputPanel from "./RunOutputPanel";
 import KnowledgeBase from "./KnowledgeBase";
 import Modal from "./Modal";
 import { Button, Badge, Field, Input, ConfirmDialog } from "./ui";
@@ -79,7 +80,7 @@ interface VersionRow {
 const LINK_BTN_SM =
   "inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 transition-colors duration-150 hover:bg-slate-100";
 
-function EditorInner({ workflowId }: { workflowId: string }) {
+function EditorInner({ workflowId, initialRunId }: { workflowId: string; initialRunId?: string }) {
   const router = useRouter();
   const reactFlow = useReactFlow();
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -122,6 +123,7 @@ function EditorInner({ workflowId }: { workflowId: string }) {
     status: string;
     startedAt: number;
   } | null>(null);
+  const [outputOpen, setOutputOpen] = useState(false);
   const [now, setNow] = useState(Date.now());
   const esRef = useRef<EventSource | null>(null);
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -146,8 +148,11 @@ function EditorInner({ workflowId }: { workflowId: string }) {
   const closeLive = useCallback(() => {
     stopLiveTimers();
     setLiveRun(null);
+    setOutputOpen(false);
     clearNodeStatuses();
-  }, [stopLiveTimers, clearNodeStatuses]);
+    // 如果是从 ?runId= 进来的查看模式，关闭时去掉参数
+    if (initialRunId) router.replace(`/workflows/${workflowId}`);
+  }, [stopLiveTimers, clearNodeStatuses, initialRunId, router, workflowId]);
 
   useEffect(() => () => stopLiveTimers(), [stopLiveTimers]);
 
@@ -320,6 +325,39 @@ function EditorInner({ workflowId }: { workflowId: string }) {
     // 同步模式的 POST 仍在后台，静默等待它结束（避免未处理 rejection）
     req.catch(() => {});
   };
+
+  /** 查看历史运行：在画布上叠加该次运行的节点状态 */
+  const viewRun = useCallback(
+    async (runId: string) => {
+      closeLive();
+      clearNodeStatuses();
+      const startTs = Date.now();
+      setLiveRun({ runId, status: "starting", startedAt: startTs });
+      setNow(startTs);
+      try {
+        const res = await fetch(`/api/runs/${runId}`);
+        const j = await res.json();
+        if (!res.ok) throw new Error(j.error || "运行记录不存在");
+        if (j.steps) applySteps(j.steps);
+        const st = String(j.run.status);
+        const created = j.run.created_at ? new Date(j.run.created_at).getTime() : startTs;
+        setLiveRun({ runId, status: st, startedAt: created });
+        setNow(Date.now());
+        if (!TERMINAL.includes(st)) {
+          // 还在跑（或等待审批）：继续实时跟进
+          attachLiveStream(runId);
+        }
+      } catch (e) {
+        setLiveRun(null);
+        toast.error(e instanceof Error ? e.message : "加载运行记录失败");
+      }
+    },
+    [closeLive, clearNodeStatuses, applySteps, attachLiveStream, TERMINAL]
+  );
+
+  useEffect(() => {
+    if (initialRunId) void viewRun(initialRunId);
+  }, [initialRunId, viewRun]);
 
   const loadWorkflow = useCallback(async () => {
     const res = await fetch(`/api/workflows/${workflowId}`);
@@ -643,10 +681,10 @@ function EditorInner({ workflowId }: { workflowId: string }) {
                     </span>
                     {liveRun.runId && (
                       <button
-                        onClick={() => router.push(`/runs/${liveRun.runId}`)}
+                        onClick={() => setOutputOpen(true)}
                         className="rounded-full bg-brand-600 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-brand-700"
                       >
-                        查看结果
+                        查看输出
                       </button>
                     )}
                   </>
@@ -661,6 +699,13 @@ function EditorInner({ workflowId }: { workflowId: string }) {
                   </svg>
                 </button>
               </div>
+            </div>
+          )}
+
+          {/* 运行输出抽屉 */}
+          {outputOpen && liveRun?.runId && (
+            <div className="absolute bottom-4 right-4 top-4 z-30 w-[400px] max-w-[calc(100%-2rem)]">
+              <RunOutputPanel runId={liveRun.runId} onClose={() => setOutputOpen(false)} />
             </div>
           )}
         </div>
@@ -792,10 +837,10 @@ function EditorInner({ workflowId }: { workflowId: string }) {
   );
 }
 
-export default function FlowEditor({ workflowId }: { workflowId: string }) {
+export default function FlowEditor({ workflowId, initialRunId }: { workflowId: string; initialRunId?: string }) {
   return (
     <ReactFlowProvider>
-      <EditorInner workflowId={workflowId} />
+      <EditorInner workflowId={workflowId} initialRunId={initialRunId} />
     </ReactFlowProvider>
   );
 }
