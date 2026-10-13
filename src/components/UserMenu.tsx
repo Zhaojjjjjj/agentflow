@@ -61,7 +61,8 @@ export default function UserMenu({ user }: { user: MeUser }) {
     try {
       await fetch("/api/auth/logout", { method: "POST" });
     } finally {
-      window.location.href = "/login";
+      // 回到落地页（未登录态的 / 就是落地页）
+      window.location.href = "/";
     }
   };
 
