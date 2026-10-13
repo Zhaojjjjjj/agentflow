@@ -122,6 +122,8 @@ function EditorInner({ workflowId, initialRunId }: { workflowId: string; initial
     runId: string | null;
     status: string;
     startedAt: number;
+    /** 已结束运行的精确用时（秒），有它就不用 now - startedAt 估算 */
+    finalElapsed?: number;
   } | null>(null);
   const [outputOpen, setOutputOpen] = useState(false);
   const [now, setNow] = useState(Date.now());
@@ -166,10 +168,22 @@ function EditorInner({ workflowId, initialRunId }: { workflowId: string; initial
     [setNodeStatuses]
   );
 
+  /** 从 run 行算出精确用时（秒）：finished_at - started_at */
+  const calcElapsed = (r: { finished_at?: string | null; started_at?: string | null; created_at?: string | null }) => {
+    if (!r.finished_at) return undefined;
+    const end = new Date(r.finished_at).getTime();
+    const start = r.started_at
+      ? new Date(r.started_at).getTime()
+      : r.created_at
+        ? new Date(r.created_at).getTime()
+        : end;
+    return Math.max(0, Math.round((end - start) / 1000));
+  };
+
   const finishLive = useCallback(
-    (status: string) => {
+    (status: string, finalElapsed?: number) => {
       stopLiveTimers();
-      setLiveRun((prev) => (prev ? { ...prev, status } : prev));
+      setLiveRun((prev) => (prev ? { ...prev, status, finalElapsed } : prev));
       if (status === "succeeded") toast.success("运行成功");
       else if (status === "failed") toast.error("运行失败，点击查看结果了解详情");
     },
@@ -186,7 +200,7 @@ function EditorInner({ workflowId, initialRunId }: { workflowId: string; initial
           const res = await fetch(`/api/runs/${runId}`);
           const j = await res.json();
           if (j.steps) applySteps(j.steps);
-          if (j.run && TERMINAL.includes(j.run.status)) finishLive(j.run.status);
+          if (j.run && TERMINAL.includes(j.run.status)) finishLive(j.run.status, calcElapsed(j.run));
         } catch {
           /* 下一轮重试 */
         }
@@ -213,7 +227,7 @@ function EditorInner({ workflowId, initialRunId }: { workflowId: string; initial
               setLiveRun((prev) => (prev ? { ...prev, status: st } : prev));
               if (TERMINAL.includes(st)) {
                 es.close();
-                finishLive(st);
+                finishLive(st, calcElapsed(j.run));
               }
             }
             if (j.type === "done") {
@@ -341,7 +355,9 @@ function EditorInner({ workflowId, initialRunId }: { workflowId: string; initial
         if (j.steps) applySteps(j.steps);
         const st = String(j.run.status);
         const created = j.run.created_at ? new Date(j.run.created_at).getTime() : startTs;
-        setLiveRun({ runId, status: st, startedAt: created });
+        // 已结束的运行：用 finished_at - started_at 的精确用时，而不是 now - created_at
+        const finalElapsed = TERMINAL.includes(st) ? calcElapsed(j.run) : undefined;
+        setLiveRun({ runId, status: st, startedAt: created, finalElapsed });
         setNow(Date.now());
         if (!TERMINAL.includes(st)) {
           // 还在跑（或等待审批）：继续实时跟进
@@ -570,7 +586,23 @@ function EditorInner({ workflowId, initialRunId }: { workflowId: string; initial
     return n ? String(n.data.label || n.id) : "";
   }, [nodeStatuses, nodes, liveRun]);
 
-  const liveElapsed = liveRun ? Math.max(0, Math.floor((now - liveRun.startedAt) / 1000)) : 0;
+  const liveElapsed =
+    liveRun?.finalElapsed ?? (liveRun ? Math.max(0, Math.floor((now - liveRun.startedAt) / 1000)) : 0);
+  /** 15232s → "4时13分"，95s → "1分35秒"，45s → "45秒" */
+  const formatDuration = (s: number) => {
+    if (s >= 3600) {
+      const h = Math.floor(s / 3600);
+      const m = Math.floor((s % 3600) / 60);
+      return m > 0 ? `${h}时${m}分` : `${h}时`;
+    }
+    if (s >= 60) {
+      const m = Math.floor(s / 60);
+      const sec = s % 60;
+      return sec > 0 ? `${m}分${sec}秒` : `${m}分`;
+    }
+    return `${s}秒`;
+  };
+  const liveElapsedText = formatDuration(liveElapsed);
   const liveDone = liveRun ? TERMINAL.includes(liveRun.status) : false;
 
   return (
@@ -702,7 +734,7 @@ function EditorInner({ workflowId, initialRunId }: { workflowId: string; initial
                       )}
                     </span>
                     <span className="rounded-full bg-slate-100 px-2 py-0.5 font-mono text-[11px] text-slate-500">
-                      {liveElapsed}s
+                      {liveElapsedText}
                     </span>
                   </>
                 )}
@@ -727,10 +759,10 @@ function EditorInner({ workflowId, initialRunId }: { workflowId: string; initial
                     />
                     <span className="text-[13px] font-medium text-slate-700">
                       {liveRun.status === "succeeded"
-                        ? `运行成功 · 用时 ${liveElapsed}s`
+                        ? `运行成功 · 用时 ${liveElapsedText}`
                         : liveRun.status === "rejected"
                           ? "运行被拒绝"
-                          : `运行失败 · 用时 ${liveElapsed}s`}
+                          : `运行失败 · 用时 ${liveElapsedText}`}
                     </span>
                     {liveRun.runId && (
                       <button
