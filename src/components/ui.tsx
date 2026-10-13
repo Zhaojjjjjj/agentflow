@@ -347,3 +347,47 @@ export function JsonBlock({ title, data }: { title: string; data: unknown }) {
     </div>
   );
 }
+
+/** 运行结果的可视化展示：按字段分块，长文本用易读排版而非 raw JSON */
+export function OutputView({ data }: { data: unknown }) {
+  if (data === null || data === undefined) {
+    return <p className="py-6 text-center text-sm text-slate-400">暂无输出</p>;
+  }
+  if (typeof data !== "object" || Array.isArray(data)) {
+    return (
+      <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-xl border border-slate-200 bg-white p-4 text-sm leading-7 text-slate-800">
+        {typeof data === "string" ? data : JSON.stringify(data, null, 2)}
+      </pre>
+    );
+  }
+  const entries = Object.entries(data as Record<string, unknown>);
+  if (entries.length === 0) {
+    return <p className="py-6 text-center text-sm text-slate-400">暂无输出</p>;
+  }
+  return (
+    <div className="space-y-3">
+      {entries.map(([key, value]) => {
+        const isLongText =
+          typeof value === "string" && (value.includes("\n") || value.length > 200);
+        return (
+          <div key={key} className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+            <div className="border-b border-slate-100 bg-slate-50/60 px-4 py-2">
+              <span className="font-mono text-xs font-medium text-slate-500">{key}</span>
+            </div>
+            <div className="px-4 py-3">
+              {isLongText ? (
+                <p className="whitespace-pre-wrap text-sm leading-7 text-slate-800">{value as string}</p>
+              ) : typeof value === "string" ? (
+                <p className="text-sm leading-6 text-slate-800">{value || <span className="text-slate-300">空</span>}</p>
+              ) : (
+                <pre className="overflow-auto font-mono text-xs leading-5 text-slate-600">
+                  {JSON.stringify(value, null, 2)}
+                </pre>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}

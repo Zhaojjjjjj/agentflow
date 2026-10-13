@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -14,7 +14,7 @@ import {
   type NodeTypes,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { NODE_META, type NodeType, type WorkflowDefinition } from "@/lib/engine/types";
+import { NODE_META, type NodeType, type StepStatus, type WorkflowDefinition } from "@/lib/engine/types";
 import { useEditorStore } from "@/store/editorStore";
 import FlowNodeView from "./FlowNodeView";
 import NodeConfigPanel from "./NodeConfigPanel";
@@ -95,6 +95,9 @@ function EditorInner({ workflowId }: { workflowId: string }) {
     load,
     getDefinition,
     markClean,
+    nodeStatuses,
+    setNodeStatuses,
+    clearNodeStatuses,
   } = useEditorStore();
 
   const [name, setName] = useState("");
@@ -112,6 +115,211 @@ function EditorInner({ workflowId }: { workflowId: string }) {
   const [scheduleCron, setScheduleCron] = useState("");
   const [scheduleEnabled, setScheduleEnabled] = useState(false);
   const [apiKey, setApiKey] = useState("");
+
+  /** 画布实时运行 */
+  const [liveRun, setLiveRun] = useState<{
+    runId: string | null;
+    status: string;
+    startedAt: number;
+  } | null>(null);
+  const [now, setNow] = useState(Date.now());
+  const esRef = useRef<EventSource | null>(null);
+  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const tickTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const liveActiveRef = useRef(false);
+
+  const TERMINAL = useMemo(
+    () => ["succeeded", "failed", "rejected", "cancelled"],
+    []
+  );
+
+  const stopLiveTimers = useCallback(() => {
+    liveActiveRef.current = false;
+    esRef.current?.close();
+    esRef.current = null;
+    if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+    pollTimerRef.current = null;
+    if (tickTimerRef.current) clearInterval(tickTimerRef.current);
+    tickTimerRef.current = null;
+  }, []);
+
+  const closeLive = useCallback(() => {
+    stopLiveTimers();
+    setLiveRun(null);
+    clearNodeStatuses();
+  }, [stopLiveTimers, clearNodeStatuses]);
+
+  useEffect(() => () => stopLiveTimers(), [stopLiveTimers]);
+
+  /** 把 step 行映射为节点状态并写入 store */
+  const applySteps = useCallback(
+    (steps: { node_id: string; status: StepStatus }[]) => {
+      const m: Record<string, StepStatus> = {};
+      for (const s of steps) m[s.node_id] = s.status;
+      setNodeStatuses(m);
+    },
+    [setNodeStatuses]
+  );
+
+  const finishLive = useCallback(
+    (status: string) => {
+      stopLiveTimers();
+      setLiveRun((prev) => (prev ? { ...prev, status } : prev));
+      if (status === "succeeded") toast.success("运行成功");
+      else if (status === "failed") toast.error("运行失败，点击查看结果了解详情");
+    },
+    [stopLiveTimers]
+  );
+
+  /** 用轮询兜底（SSE 不可用时） */
+  const fallbackPoll = useCallback(
+    (runId: string) => {
+      if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+      pollTimerRef.current = setInterval(async () => {
+        if (!liveActiveRef.current) return;
+        try {
+          const res = await fetch(`/api/runs/${runId}`);
+          const j = await res.json();
+          if (j.steps) applySteps(j.steps);
+          if (j.run && TERMINAL.includes(j.run.status)) finishLive(j.run.status);
+        } catch {
+          /* 下一轮重试 */
+        }
+      }, 2000);
+    },
+    [applySteps, finishLive, TERMINAL]
+  );
+
+  const attachLiveStream = useCallback(
+    (runId: string) => {
+      liveActiveRef.current = true;
+      tickTimerRef.current = setInterval(() => setNow(Date.now()), 1000);
+      let sseOk = false;
+      try {
+        const es = new EventSource(`/api/runs/${runId}/stream`);
+        esRef.current = es;
+        es.onmessage = (e) => {
+          sseOk = true;
+          try {
+            const j = JSON.parse(e.data);
+            if (j.steps) applySteps(j.steps);
+            if (j.run) {
+              const st = String(j.run.status);
+              setLiveRun((prev) => (prev ? { ...prev, status: st } : prev));
+              if (TERMINAL.includes(st)) {
+                es.close();
+                finishLive(st);
+              }
+            }
+            if (j.type === "done") {
+              es.close();
+              // done 但非终态（等待审批且 SSE 超时）→ 转慢速轮询
+              setLiveRun((prev) => {
+                if (prev && !TERMINAL.includes(prev.status)) {
+                  setTimeout(() => fallbackPoll(runId), 0);
+                }
+                return prev;
+              });
+            }
+          } catch {
+            /* ignore */
+          }
+        };
+        es.onerror = () => {
+          es.close();
+          if (!sseOk && liveActiveRef.current) fallbackPoll(runId);
+        };
+      } catch {
+        fallbackPoll(runId);
+      }
+      // SSE 一直没消息则兜底
+      setTimeout(() => {
+        if (!sseOk && liveActiveRef.current && !pollTimerRef.current) fallbackPoll(runId);
+      }, 4000);
+    },
+    [applySteps, finishLive, fallbackPoll, TERMINAL]
+  );
+
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+  const run = async (input: Record<string, unknown>, mode: "async" | "sync") => {
+    if (dirty) await save(true);
+    closeLive();
+    const startTs = Date.now();
+    clearNodeStatuses();
+    setLiveRun({ runId: null, status: "starting", startedAt: startTs });
+    setNow(startTs);
+
+    let reqId: string | null = null;
+    let reqError: Error | null = null;
+    const req = fetch("/api/runs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ workflowId, input, mode }),
+    })
+      .then(async (res) => {
+        const j = await res.json();
+        if (!res.ok) throw new Error(j.error || "启动失败");
+        return j.runId as string;
+      })
+      .then(
+        (id) => {
+          reqId = id;
+          return id;
+        },
+        (err) => {
+          reqError = err instanceof Error ? err : new Error(String(err));
+          throw reqError;
+        }
+      );
+
+    // 同步模式下 POST 会阻塞到执行结束；通过运行列表反查 runId 以便实时跟进
+    let runId: string | null = null;
+    for (let i = 0; i < 60; i++) {
+      if (reqId) {
+        runId = reqId;
+        break;
+      }
+      if (reqError) break;
+      await sleep(1000);
+      if (reqId) {
+        runId = reqId;
+        break;
+      }
+      if (reqError) break;
+      try {
+        const r = await fetch(`/api/runs?workflowId=${workflowId}&limit=5`);
+        const j = await r.json();
+        const hit = (j.runs || []).find(
+          (x: { created_at: string; status: string; id: string }) =>
+            new Date(x.created_at).getTime() >= startTs - 5000 &&
+            ["queued", "running", "waiting_approval"].includes(x.status)
+        );
+        if (hit) {
+          runId = hit.id as string;
+          break;
+        }
+      } catch {
+        /* 下一轮重试 */
+      }
+    }
+    if (!runId && !reqError) {
+      try {
+        runId = await req;
+      } catch (e) {
+        reqError = e instanceof Error ? e : new Error(String(e));
+      }
+    }
+    if (reqError || !runId) {
+      setLiveRun(null);
+      toast.error(reqError ? reqError.message : "启动失败：未检测到运行记录");
+      return;
+    }
+    setLiveRun({ runId, status: "running", startedAt: startTs });
+    attachLiveStream(runId);
+    // 同步模式的 POST 仍在后台，静默等待它结束（避免未处理 rejection）
+    req.catch(() => {});
+  };
 
   const loadWorkflow = useCallback(async () => {
     const res = await fetch(`/api/workflows/${workflowId}`);
@@ -168,18 +376,6 @@ function EditorInner({ workflowId }: { workflowId: string }) {
     } finally {
       setSaving(false);
     }
-  };
-
-  const run = async (input: Record<string, unknown>, mode: "async" | "sync") => {
-    if (dirty) await save(true);
-    const res = await fetch("/api/runs", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ workflowId, input, mode }),
-    });
-    const j = await res.json();
-    if (!res.ok) throw new Error(j.error || "启动失败");
-    router.push(`/runs/${j.runId}`);
   };
 
   const togglePublish = async () => {
@@ -250,10 +446,45 @@ function EditorInner({ workflowId }: { workflowId: string }) {
     }
   };
 
+  /** 需要 Inngest 异步执行的节点类型：人工审批（要等人）、定时触发 */
+  const needsAsync = nodes.some((n) =>
+    ["human-approval", "trigger-schedule"].includes(
+      (n.data as { nodeType?: string } | undefined)?.nodeType ?? ""
+    )
+  );
+
+  /** 实时运行时：让"前沿"的边流动起来 */
+  const displayEdges = useMemo(() => {
+    const streaming =
+      liveRun && !TERMINAL.includes(liveRun.status) && liveRun.status !== "starting";
+    if (!streaming) return edges;
+    return edges.map((e) => {
+      const s = nodeStatuses[e.source];
+      const t = nodeStatuses[e.target];
+      const animated =
+        (s === "running" || s === "succeeded") &&
+        t !== "succeeded" &&
+        t !== "failed" &&
+        t !== "skipped";
+      return animated ? { ...e, animated: true } : e;
+    });
+  }, [edges, nodeStatuses, liveRun, TERMINAL]);
+
+  /** 当前正在执行的节点名称（进度条用） */
+  const runningNodeName = useMemo(() => {
+    if (!liveRun) return "";
+    const runningId = Object.keys(nodeStatuses).find((id) => nodeStatuses[id] === "running");
+    if (!runningId) return "";
+    const n = nodes.find((x) => x.id === runningId);
+    return n ? String(n.data.label || n.id) : "";
+  }, [nodeStatuses, nodes, liveRun]);
+
+  const liveElapsed = liveRun ? Math.max(0, Math.floor((now - liveRun.startedAt) / 1000)) : 0;
+  const liveDone = liveRun ? TERMINAL.includes(liveRun.status) : false;
+
   return (
     <div className="flex h-screen flex-col bg-white">
-      {/* toolbar */}
-      <header className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white px-4 py-2.5">
+      {/* toolbar */}      <header className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white px-4 py-2.5">
         <Link
           href="/"
           title="返回工作流列表"
@@ -304,7 +535,7 @@ function EditorInner({ workflowId }: { workflowId: string }) {
         <div className="relative min-w-0 flex-1 bg-white" ref={wrapperRef}>
           <ReactFlow
             nodes={nodes}
-            edges={edges}
+            edges={displayEdges}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
@@ -346,6 +577,92 @@ function EditorInner({ workflowId }: { workflowId: string }) {
               </div>
             )}
           </ReactFlow>
+
+          {/* 实时运行进度条 */}
+          {liveRun && (
+            <div className="absolute left-1/2 top-4 z-20 -translate-x-1/2">
+              <div
+                className={`flex items-center gap-3 rounded-full border py-2 pl-4 pr-2 shadow-lg backdrop-blur ${
+                  liveRun.status === "failed"
+                    ? "border-red-200 bg-red-50/95"
+                    : liveRun.status === "waiting_approval"
+                      ? "border-amber-200 bg-amber-50/95"
+                      : liveDone
+                        ? "border-green-200 bg-green-50/95"
+                        : "border-brand-200 bg-white/95"
+                }`}
+              >
+                {liveRun.status === "starting" && (
+                  <>
+                    <span className="h-2 w-2 animate-pulse rounded-full bg-brand-500" />
+                    <span className="text-[13px] font-medium text-slate-700">正在启动…</span>
+                  </>
+                )}
+                {!liveDone && liveRun.status !== "starting" && liveRun.status !== "waiting_approval" && (
+                  <>
+                    <span className="relative flex h-2.5 w-2.5">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand-400 opacity-75" />
+                      <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-brand-500" />
+                    </span>
+                    <span className="text-[13px] font-medium text-slate-700">
+                      正在运行
+                      {runningNodeName && (
+                        <span className="text-slate-400"> · {runningNodeName}</span>
+                      )}
+                    </span>
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 font-mono text-[11px] text-slate-500">
+                      {liveElapsed}s
+                    </span>
+                  </>
+                )}
+                {liveRun.status === "waiting_approval" && (
+                  <>
+                    <span className="h-2.5 w-2.5 rounded-full bg-amber-400" />
+                    <span className="text-[13px] font-medium text-amber-800">
+                      等待人工审批{runningNodeName ? ` · ${runningNodeName}` : ""}
+                    </span>
+                    <button
+                      onClick={() => liveRun.runId && router.push(`/runs/${liveRun.runId}`)}
+                      className="rounded-full bg-amber-500 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-amber-600"
+                    >
+                      去审批
+                    </button>
+                  </>
+                )}
+                {liveDone && (
+                  <>
+                    <span
+                      className={`h-2.5 w-2.5 rounded-full ${liveRun.status === "succeeded" ? "bg-green-500" : "bg-red-500"}`}
+                    />
+                    <span className="text-[13px] font-medium text-slate-700">
+                      {liveRun.status === "succeeded"
+                        ? `运行成功 · 用时 ${liveElapsed}s`
+                        : liveRun.status === "rejected"
+                          ? "运行被拒绝"
+                          : `运行失败 · 用时 ${liveElapsed}s`}
+                    </span>
+                    {liveRun.runId && (
+                      <button
+                        onClick={() => router.push(`/runs/${liveRun.runId}`)}
+                        className="rounded-full bg-brand-600 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-brand-700"
+                      >
+                        查看结果
+                      </button>
+                    )}
+                  </>
+                )}
+                <button
+                  onClick={closeLive}
+                  className="rounded-full p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+                  title="关闭"
+                >
+                  <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M6.3 5.3a1 1 0 0 0-1.4 1.4L8.6 10l-3.7 3.3a1 1 0 1 0 1.4 1.4L10 11.4l3.7 3.3a1 1 0 1 0 1.4-1.4L11.4 10l3.7-3.3a1 1 0 0 0-1.4-1.4L10 8.6 6.3 5.3z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* config drawer */}
@@ -353,13 +670,6 @@ function EditorInner({ workflowId }: { workflowId: string }) {
           <NodeConfigPanel />
         </aside>
       </div>
-
-  /** 需要 Inngest 异步执行的节点类型：人工审批（要等人）、定时触发 */
-  const needsAsync = nodes.some((n) =>
-    ["human-approval", "trigger-schedule"].includes(
-      (n.data as { nodeType?: string } | undefined)?.nodeType ?? ""
-    )
-  );
 
       <RunDialog
         open={runOpen}

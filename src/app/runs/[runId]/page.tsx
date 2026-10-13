@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import TopNav from "@/components/TopNav";
-import { PageHeader, StatusBadge, RunTimeline, JsonBlock, Badge, Button, Textarea, type StepRow } from "@/components/ui";
+import { PageHeader, StatusBadge, RunTimeline, JsonBlock, OutputView, Badge, Button, Textarea, type StepRow } from "@/components/ui";
 import { toast } from "@/components/toast";
 
 interface RunDetail {
@@ -180,7 +180,8 @@ export default function RunDetailPage({ params }: { params: Promise<{ runId: str
         {run && (
           <>
             <JsonBlock title="输入 input" data={run.input} />
-            <JsonBlock title="输出 output" data={run.output} />
+            <h4 className="mb-1.5 text-xs font-semibold text-slate-500">输出 output</h4>
+            <OutputView data={run.output} />
           </>
         )}
       </div>

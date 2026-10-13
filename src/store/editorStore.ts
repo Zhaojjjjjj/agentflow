@@ -12,7 +12,7 @@ import {
   type OnConnect,
   type Connection,
 } from "@xyflow/react";
-import type { FlowNodeConfig, NodeType, WorkflowDefinition } from "@/lib/engine/types";
+import type { FlowNodeConfig, NodeType, StepStatus, WorkflowDefinition } from "@/lib/engine/types";
 import { NODE_META, findCycle } from "@/lib/engine/types";
 import { toast } from "@/components/toast";
 
@@ -108,6 +108,10 @@ interface EditorState {
   load: (def: WorkflowDefinition) => void;
   getDefinition: () => WorkflowDefinition;
   markClean: () => void;
+  /** 实时运行中的节点状态（runId 维度，key 为节点 id） */
+  nodeStatuses: Record<string, StepStatus>;
+  setNodeStatuses: (s: Record<string, StepStatus>) => void;
+  clearNodeStatuses: () => void;
 }
 
 export const useEditorStore = create<EditorState>((set, get) => ({
@@ -230,4 +234,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   markClean: () => set({ dirty: false }),
+
+  nodeStatuses: {},
+  setNodeStatuses: (s) => set({ nodeStatuses: s }),
+  clearNodeStatuses: () => set({ nodeStatuses: {} }),
 }));
