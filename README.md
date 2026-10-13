@@ -91,24 +91,6 @@ openssl rand -hex 32
 
 > 注意：向量供应商的 `dimensions` 须与 `documents.embedding` 的向量维度一致（默认 1024），否则入库会失败。
 
-### 3.6 控制台登录（单管理员账号）
-
-整个控制台（所有页面 + 内部数据 API）都需要登录后访问，未登录访问页面会自动跳转到 `/login`，调内部 API 返回 401。
-
-配置（见 `.env.example`）：
-
-| 变量 | 说明 |
-|---|---|
-| `ADMIN_USERNAME` | 管理员用户名，不填则默认为 `admin01` |
-| `ADMIN_PASSWORD` | 管理员密码，**必填**；未配置时登录接口返回 503 |
-| `AUTH_SECRET` | 会话 JWT 签名密钥（任意随机字符串，`openssl rand -hex 32`）；不填则回退到 `APP_ENCRYPTION_KEY`，两者都没有时无法登录 |
-
-实现细节：
-- 会话为 HS256 JWT，存于 `httpOnly` + `SameSite=Lax` cookie（`agentflow_session`，生产环境自动加 `Secure`），有效期 7 天
-- 登录接口对用户名和密码分别做 timing-safe 比较，失败统一返回「用户名或密码错误」，不泄露哪一项错误
-- `middleware.ts` 统一拦截；**公开端点**：`/login`、`/api/auth/*`、`/api/health`、`/api/inngest`（Inngest 云回调靠 `INNGEST_SIGNING_KEY` 自有验签）、`/api/public/*`（走 API Key 自有鉴权）
-- 各页面右上角有「退出登录」按钮，调用 `POST /api/auth/logout` 清除会话
-
 ### 4. 本地运行
 
 ```bash
