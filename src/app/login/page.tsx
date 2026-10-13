@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button, Field, Input } from "@/components/ui";
 
@@ -97,9 +97,26 @@ function LoginForm() {
   const next = safeNext(searchParams.get("next"));
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [captcha, setCaptcha] = useState("");
+  const [captchaSvg, setCaptchaSvg] = useState("");
   const [error, setError] = useState("");
   const [shakeKey, setShakeKey] = useState(0);
   const [loading, setLoading] = useState(false);
+
+  const refreshCaptcha = async () => {
+    setCaptcha("");
+    try {
+      const res = await fetch("/api/auth/captcha");
+      const j = await res.json();
+      if (j.svg) setCaptchaSvg(j.svg);
+    } catch {
+      /* 忽略，提交时后端会校验 */
+    }
+  };
+
+  useEffect(() => {
+    void refreshCaptcha();
+  }, []);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -109,7 +126,7 @@ function LoginForm() {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ username, password, captcha }),
       });
       const j = await res.json().catch(() => ({}));
       if (res.ok) {
@@ -117,6 +134,7 @@ function LoginForm() {
       } else {
         setError(j.error || "登录失败");
         setShakeKey((k) => k + 1);
+        void refreshCaptcha();
       }
     } catch {
       setError("网络错误，请重试");
@@ -178,6 +196,30 @@ function LoginForm() {
                 autoComplete="current-password"
               />
             </Field>
+            <Field label="验证码">
+              <div className="flex gap-2.5">
+                <Input
+                  value={captcha}
+                  onChange={(e) => setCaptcha(e.target.value)}
+                  placeholder="请输入验证码"
+                  autoComplete="off"
+                  className="flex-1"
+                />
+                <button
+                  type="button"
+                  onClick={() => void refreshCaptcha()}
+                  title="换一张"
+                  className="h-[42px] w-[120px] shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-50"
+                >
+                  {captchaSvg ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={captchaSvg} alt="验证码" className="h-full w-full object-cover" />
+                  ) : (
+                    <span className="text-xs text-slate-400">加载中…</span>
+                  )}
+                </button>
+              </div>
+            </Field>
             {error && (
               <p
                 key={shakeKey}
@@ -190,7 +232,7 @@ function LoginForm() {
               type="submit"
               variant="primary"
               className="w-full !py-2.5"
-              disabled={loading || !username || !password}
+              disabled={loading || !username || !password || !captcha}
             >
               {loading ? "登录中…" : "登录"}
             </Button>

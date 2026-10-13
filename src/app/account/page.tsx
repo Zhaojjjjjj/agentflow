@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { toast } from "@/components/toast";
 import { PageHeader, Button, Field, Input } from "@/components/ui";
 import { useMe, type MeUser } from "@/components/UserMenu";
@@ -138,6 +139,15 @@ export default function AccountPage() {
 
   return (
     <main className="mx-auto max-w-3xl px-6 py-10">
+      <Link
+        href="/"
+        className="mb-5 inline-flex items-center gap-1.5 text-sm text-slate-400 transition-colors hover:text-slate-700"
+      >
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+          <path d="M10 3 5 8l5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        返回控制台
+      </Link>
       <PageHeader title="个人设置" desc="管理你的头像与登录密码" />
       <section className="card mb-6 p-6">
         <h3 className="mb-4 text-sm font-semibold text-slate-800">头像</h3>

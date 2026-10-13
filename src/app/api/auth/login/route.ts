@@ -5,13 +5,15 @@ import {
   isLoginConfigured,
   isProduction,
   sessionCookieAttrs,
+  clearCookieAttrs,
 } from "@/lib/auth";
 import { verifyPassword } from "@/lib/password";
 import { ensureSeeded, getUserByUsername } from "@/lib/users";
+import { CAPTCHA_COOKIE, verifyCode } from "@/lib/captcha";
 
 export const dynamic = "force-dynamic";
 
-/** Multi-user login: verifies against the users table (admin seeded from env on first use). */
+/** Multi-user login: verifies captcha + credentials against the users table. */
 export async function POST(req: Request) {
   if (!isLoginConfigured()) {
     return NextResponse.json(
@@ -28,6 +30,19 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
   const username = typeof body.username === "string" ? body.username.trim() : "";
   const password = typeof body.password === "string" ? body.password : "";
+  const captcha = typeof body.captcha === "string" ? body.captcha : "";
+
+  // 先验验证码（防爆破），再验账号密码
+  const cookieHeader = req.headers.get("cookie") || "";
+  const captchaToken = cookieHeader
+    .split(";")
+    .map((c) => c.trim())
+    .find((c) => c.startsWith(`${CAPTCHA_COOKIE}=`))
+    ?.slice(CAPTCHA_COOKIE.length + 1);
+  const captchaOk = await verifyCode(captcha, captchaToken ? decodeURIComponent(captchaToken) : null);
+  if (!captchaOk) {
+    return NextResponse.json({ error: "验证码错误或已过期", captcha: true }, { status: 400 });
+  }
   if (!username || !password) {
     return NextResponse.json({ error: "用户名或密码错误" }, { status: 401 });
   }
@@ -55,5 +70,8 @@ export async function POST(req: Request) {
   });
   const { name, ...attrs } = sessionCookieAttrs({ secure: isProduction() });
   res.cookies.set(name, token, attrs);
+  // 验证码一次性使用：登录成功后清除
+  const { name: cn, ...cattrs } = clearCookieAttrs({ secure: isProduction() });
+  res.cookies.set(cn, "", cattrs);
   return res;
 }
