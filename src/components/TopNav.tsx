@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import UserMenu, { useMe } from "./UserMenu";
 import CommandPalette from "./CommandPalette";
+import Logo from "./Logo";
 
 export default function TopNav() {
   const pathname = usePathname();
@@ -26,7 +27,7 @@ export default function TopNav() {
       <header className="sticky top-0 z-40 border-b border-slate-200/70 bg-white/80 backdrop-blur-md">
         <div className="mx-auto flex h-14 max-w-6xl items-stretch gap-6 px-6">
           <Link href="/" className="flex shrink-0 items-center gap-2">
-            <span className="h-2.5 w-2.5 rounded-full bg-brand-600" />
+            <Logo size={26} />
             <span className="text-[15px] font-semibold tracking-tight text-slate-900">agentflow</span>
           </Link>
           <nav className="flex items-stretch gap-1">
