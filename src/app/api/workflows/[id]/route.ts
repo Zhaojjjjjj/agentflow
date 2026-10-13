@@ -1,13 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabase } from "@/lib/supabase";
+import { authUser, unauthorized, canAccessWorkflow } from "@/lib/access";
 import { validateCron, cronNext } from "@/lib/engine/cron";
 
 export const dynamic = "force-dynamic";
 
 type Params = { params: Promise<{ id: string }> };
 
-export async function GET(_req: NextRequest, { params }: Params) {
+async function guard(req: NextRequest, id: string) {
+  const me = await authUser(req);
+  if (!me) return { response: unauthorized() as NextResponse, me: null };
+  if (!(await canAccessWorkflow(id, me))) {
+    return { response: NextResponse.json({ error: "工作流不存在或无权访问" }, { status: 404 }) as NextResponse, me: null };
+  }
+  return { response: null as NextResponse | null, me };
+}
+
+export async function GET(req: NextRequest, { params }: Params) {
   const { id } = await params;
+  const { response } = await guard(req, id);
+  if (response) return response;
   const sb = getSupabase();
   const { data, error } = await sb.from("workflows").select("*").eq("id", id).single();
   if (error) return NextResponse.json({ error: "工作流不存在" }, { status: 404 });
@@ -16,6 +28,8 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
 export async function PATCH(req: NextRequest, { params }: Params) {
   const { id } = await params;
+  const { response } = await guard(req, id);
+  if (response) return response;
   const sb = getSupabase();
   const body = await req.json().catch(() => ({}));
 
@@ -73,8 +87,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   return NextResponse.json({ ok: true });
 }
 
-export async function DELETE(_req: NextRequest, { params }: Params) {
+export async function DELETE(req: NextRequest, { params }: Params) {
   const { id } = await params;
+  const { response } = await guard(req, id);
+  if (response) return response;
   const sb = getSupabase();
   const { error } = await sb.from("workflows").delete().eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

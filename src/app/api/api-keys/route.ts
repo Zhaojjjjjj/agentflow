@@ -1,28 +1,47 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabase } from "@/lib/supabase";
+import { authUser, unauthorized, canAccessWorkflow, visibleWorkflowIds } from "@/lib/access";
 import { mintApiKey } from "@/lib/engine/runService";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
+  const me = await authUser(req);
+  if (!me) return unauthorized();
   const sb = getSupabase();
   const { searchParams } = new URL(req.url);
   const workflowId = searchParams.get("workflowId");
+  if (workflowId && !(await canAccessWorkflow(workflowId, me))) {
+    return NextResponse.json({ error: "工作流不存在或无权访问" }, { status: 404 });
+  }
   let q = sb
     .from("api_keys")
     .select("id, name, key_prefix, workflow_id, created_at, last_used_at")
     .order("created_at", { ascending: false });
-  if (workflowId) q = q.eq("workflow_id", workflowId);
+  if (workflowId) {
+    q = q.eq("workflow_id", workflowId);
+  } else {
+    const ids = await visibleWorkflowIds(me);
+    if (ids !== null) {
+      if (ids.length === 0) return NextResponse.json({ keys: [] });
+      q = q.in("workflow_id", ids);
+    }
+  }
   const { data, error } = await q;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ keys: data });
 }
 
 export async function POST(req: NextRequest) {
+  const me = await authUser(req);
+  if (!me) return unauthorized();
   const body = await req.json().catch(() => ({}));
   const workflowId = String(body.workflowId || "");
   const name = String(body.name || "默认").slice(0, 80);
   if (!workflowId) return NextResponse.json({ error: "缺少 workflowId" }, { status: 400 });
+  if (!(await canAccessWorkflow(workflowId, me))) {
+    return NextResponse.json({ error: "工作流不存在或无权访问" }, { status: 404 });
+  }
   try {
     const { id, key, prefix } = await mintApiKey(workflowId, name);
     // key is shown only once — the UI must display it immediately

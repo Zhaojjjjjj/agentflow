@@ -1,12 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabase } from "@/lib/supabase";
+import { authUser, unauthorized, canAccessWorkflow } from "@/lib/access";
 
 export const dynamic = "force-dynamic";
 
 type Params = { params: Promise<{ id: string; version: string }> };
 
-export async function POST(_req: NextRequest, { params }: Params) {
+export async function POST(req: NextRequest, { params }: Params) {
+  const me = await authUser(req);
+  if (!me) return unauthorized();
   const { id, version } = await params;
+  if (!(await canAccessWorkflow(id, me))) {
+    return NextResponse.json({ error: "工作流不存在或无权访问" }, { status: 404 });
+  }
   const sb = getSupabase();
   const { data: snap } = await sb
     .from("workflow_versions")

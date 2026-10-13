@@ -1,15 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabase } from "@/lib/supabase";
+import { authUser, unauthorized, canAccessWorkflow } from "@/lib/access";
 import { embed } from "@/lib/llm/embeddings";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 export async function GET(req: NextRequest) {
+  const me = await authUser(req);
+  if (!me) return unauthorized();
   const sb = getSupabase();
   const { searchParams } = new URL(req.url);
   const workflowId = searchParams.get("workflowId");
   if (!workflowId) return NextResponse.json({ error: "缺少 workflowId" }, { status: 400 });
+  if (!(await canAccessWorkflow(workflowId, me))) {
+    return NextResponse.json({ error: "工作流不存在或无权访问" }, { status: 404 });
+  }
   const { data, error } = await sb
     .from("documents")
     .select("id, content, metadata, created_at")
@@ -22,10 +28,16 @@ export async function GET(req: NextRequest) {
 
 /** Ingest text chunks: embed each chunk and store with its vector. */
 export async function POST(req: NextRequest) {
+  const me = await authUser(req);
+  if (!me) return unauthorized();
   const body = await req.json().catch(() => ({}));
   const workflowId = String(body.workflowId || "");
   const chunks = Array.isArray(body.chunks) ? body.chunks : [];
   if (!workflowId) return NextResponse.json({ error: "缺少 workflowId" }, { status: 400 });
+  if (!(await canAccessWorkflow(workflowId, me))) {
+    return NextResponse.json({ error: "工作流不存在或无权访问" }, { status: 404 });
+  }
+  if (chunks.length === 0) return NextResponse.json({ error: "chunks 为空" }, { status: 400 });
   if (chunks.length === 0) return NextResponse.json({ error: "chunks 为空" }, { status: 400 });
   if (chunks.length > 50) return NextResponse.json({ error: "单次最多 50 个 chunk" }, { status: 400 });
 

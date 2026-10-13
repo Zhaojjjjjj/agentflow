@@ -1,76 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { NODE_META, type FlowNodeConfig, type NodeType } from "@/lib/engine/types";
 import { useEditorStore } from "@/store/editorStore";
 import { Field, Button, ConfirmDialog } from "./ui";
+import { collectUpstreamVars, subflowVars } from "./nodeConfig/vars";
+import {
+  TemplateTextarea,
+  TemplateInput,
+  TemperatureSlider,
+  ConditionBuilder,
+  ScheduleBuilder,
+  ModelPicker,
+  KVEditor,
+} from "./nodeConfig/fields";
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return <p className="mb-2 mt-5 text-xs font-semibold text-slate-700 first:mt-0">{children}</p>;
-}
-
-function KVEditor({
-  value,
-  onChange,
-}: {
-  value: Record<string, string>;
-  onChange: (v: Record<string, string>) => void;
-}) {
-  const entries = Object.entries(value || {});
-  const set = (k: string, v: string) => onChange({ ...(value || {}), [k]: v });
-  const del = (k: string) => {
-    const c = { ...(value || {}) };
-    delete c[k];
-    onChange(c);
-  };
-  const [newKey, setNewKey] = useState("");
-  const addNew = () => {
-    if (newKey.trim()) {
-      set(newKey.trim(), "");
-      setNewKey("");
-    }
-  };
-  return (
-    <div className="overflow-hidden rounded-lg border border-slate-200">
-      <div className="flex gap-2 border-b border-slate-100 bg-slate-50 px-3 py-1.5 text-[11px] font-medium text-slate-400">
-        <span className="w-1/3">字段名</span>
-        <span className="flex-1">模板</span>
-        <span className="w-8" />
-      </div>
-      {entries.map(([k, v]) => (
-        <div key={k} className="flex items-center gap-2 border-b border-slate-100 px-3 py-2 last:border-0">
-          <code className="w-1/3 truncate font-mono text-xs text-slate-600">{k}</code>
-          <input
-            className="input flex-1 !py-1.5 font-mono text-xs"
-            value={v}
-            onChange={(e) => set(k, e.target.value)}
-            placeholder="{{变量}} 或文本"
-          />
-          <button
-            className="w-8 shrink-0 rounded-md py-1 text-center text-sm text-slate-300 transition-colors duration-150 hover:bg-red-50 hover:text-red-500"
-            onClick={() => del(k)}
-            title="删除字段"
-          >
-            ×
-          </button>
-        </div>
-      ))}
-      <div className="flex gap-2 bg-slate-50 px-3 py-2">
-        <input
-          className="input flex-1 !py-1.5 text-xs"
-          value={newKey}
-          onChange={(e) => setNewKey(e.target.value)}
-          placeholder="新字段名，回车添加"
-          onKeyDown={(e) => {
-            if (e.key === "Enter") addNew();
-          }}
-        />
-        <Button variant="secondary" size="sm" onClick={addNew}>
-          添加
-        </Button>
-      </div>
-    </div>
-  );
 }
 
 const SUB_TYPES: NodeType[] = ["llm", "http-request", "rag-retrieve", "output"];
@@ -82,13 +28,17 @@ interface SubNode {
   data: { label: string; config: Record<string, unknown> };
 }
 
+/** 循环内部子流程：按子节点类型给迷你表单，不再手写 JSON */
 function LoopSubflowEditor({
   config,
   onChange,
+  outerVars,
 }: {
   config: FlowNodeConfig;
   onChange: (c: FlowNodeConfig) => void;
+  outerVars: ReturnType<typeof collectUpstreamVars>;
 }) {
+  const vars = useMemo(() => subflowVars(outerVars), [outerVars]);
   const nodes = (config.nodes as SubNode[]) || [];
   const setNodes = (ns: SubNode[]) => {
     const edges = ns.slice(1).map((n, i) => ({
@@ -99,70 +49,118 @@ function LoopSubflowEditor({
     onChange({ ...config, nodes: ns, edges });
   };
   const updateNode = (idx: number, patch: Partial<SubNode>) => {
-    const ns = nodes.map((n, i) => (i === idx ? { ...n, ...patch } : n));
-    setNodes(ns);
+    setNodes(nodes.map((n, i) => (i === idx ? { ...n, ...patch } : n)));
   };
-  const updateNodeData = (idx: number, data: SubNode["data"]) => updateNode(idx, { data });
+  const setCfg = (idx: number, patch: Record<string, unknown>) => {
+    const n = nodes[idx];
+    updateNode(idx, { data: { ...n.data, config: { ...n.data.config, ...patch } } });
+  };
+
   return (
     <div className="space-y-2.5">
-      {nodes.map((n, i) => (
-        <div key={n.id} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-          <div className="mb-2.5 flex items-center gap-2">
-            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-50 text-[11px] font-semibold text-brand-700">
-              {i + 1}
-            </span>
-            <select
-              className="input flex-1 !py-1.5 text-xs"
-              value={n.type}
-              onChange={(e) => {
-                const t = e.target.value as NodeType;
-                updateNode(i, {
-                  type: t,
-                  data: { label: NODE_META[t].label, config: {} },
-                });
-              }}
-            >
-              {SUB_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {NODE_META[t].label}
-                </option>
-              ))}
-            </select>
-            <button
-              className="shrink-0 rounded-md px-1.5 py-1 text-sm text-slate-300 transition-colors duration-150 hover:bg-red-50 hover:text-red-500"
-              onClick={() => setNodes(nodes.filter((_, j) => j !== i))}
-              title="删除子节点"
-            >
-              ×
-            </button>
+      {nodes.map((n, i) => {
+        const sc = n.data.config || {};
+        return (
+          <div key={n.id} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+            <div className="mb-2.5 flex items-center gap-2">
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-50 text-[11px] font-semibold text-brand-700">
+                {i + 1}
+              </span>
+              <select
+                className="input flex-1 !py-1.5 text-xs"
+                value={n.type}
+                onChange={(e) => {
+                  const t = e.target.value as NodeType;
+                  updateNode(i, { type: t, data: { label: NODE_META[t].label, config: {} } });
+                }}
+              >
+                {SUB_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {NODE_META[t].label}
+                  </option>
+                ))}
+              </select>
+              <button
+                className="shrink-0 rounded-md px-1.5 py-1 text-sm text-slate-300 transition-colors hover:bg-red-50 hover:text-red-500"
+                onClick={() => setNodes(nodes.filter((_, j) => j !== i))}
+                title="删除子节点"
+              >
+                ×
+              </button>
+            </div>
+            <input
+              className="input mb-2 !py-1.5 text-xs"
+              value={n.data.label}
+              onChange={(e) => updateNode(i, { data: { ...n.data, label: e.target.value } })}
+              placeholder="子节点名称"
+            />
+            {n.type === "llm" && (
+              <TemplateTextarea
+                rows={3}
+                vars={vars}
+                value={String(sc.prompt || "")}
+                onChange={(v) => setCfg(i, { prompt: v })}
+                placeholder="对这一项做什么，比如：把下面这段话翻译成英文：{{item}}"
+              />
+            )}
+            {n.type === "http-request" && (
+              <div className="flex gap-2">
+                <select
+                  className="input w-24 shrink-0 !py-1.5 text-xs"
+                  value={String(sc.method || "GET")}
+                  onChange={(e) => setCfg(i, { method: e.target.value })}
+                >
+                  {["GET", "POST", "PUT", "PATCH", "DELETE"].map((m) => (
+                    <option key={m}>{m}</option>
+                  ))}
+                </select>
+                <div className="min-w-0 flex-1">
+                  <TemplateInput
+                    vars={vars}
+                    value={String(sc.url || "")}
+                    onChange={(v) => setCfg(i, { url: v })}
+                    placeholder="网址，如 https://api.example.com/score?text={{item}}"
+                    mono
+                  />
+                </div>
+              </div>
+            )}
+            {n.type === "rag-retrieve" && (
+              <div className="flex gap-2">
+                <div className="min-w-0 flex-1">
+                  <TemplateInput
+                    vars={vars}
+                    value={String(sc.query || "")}
+                    onChange={(v) => setCfg(i, { query: v })}
+                    placeholder="搜什么，比如：{{item}}"
+                  />
+                </div>
+                <input
+                  className="input w-20 shrink-0 !py-1.5 text-xs"
+                  type="number"
+                  min={1}
+                  max={50}
+                  title="取几条"
+                  value={Number(sc.topK ?? 5)}
+                  onChange={(e) => setCfg(i, { topK: Number(e.target.value) })}
+                />
+              </div>
+            )}
+            {n.type === "output" && (
+              <KVEditor
+                vars={vars}
+                value={(sc.fields as Record<string, string>) || {}}
+                onChange={(v) => setCfg(i, { fields: v })}
+              />
+            )}
+            <p className="mt-1.5 text-[11px] leading-4 text-slate-400">
+              {"{{item}}"} 是当前这一项，{"{{itemIndex}}"} 是第几项
+            </p>
           </div>
-          <input
-            className="input mb-2 !py-1.5 text-xs"
-            value={n.data.label}
-            onChange={(e) => updateNodeData(i, { ...n.data, label: e.target.value })}
-            placeholder="子节点名称"
-          />
-          <textarea
-            className="input font-mono text-xs"
-            rows={4}
-            value={JSON.stringify(n.data.config || {}, null, 2)}
-            onChange={(e) => {
-              try {
-                const cfg = JSON.parse(e.target.value) as Record<string, unknown>;
-                updateNodeData(i, { ...n.data, config: cfg });
-              } catch {
-                /* 输入非法 JSON 时暂不更新 */
-              }
-            }}
-            placeholder='{"prompt": "处理：{{item}}"}'
-          />
-          <p className="mt-1.5 text-[11px] leading-4 text-slate-400">
-            可用变量：{"{{item}}"}（当前项）、{"{{itemIndex}}"}，以及外层所有节点输出如 {"{{llm-1.text}}"}
-          </p>
-        </div>
-      ))}
+        );
+      })}
       <button
-        className="w-full rounded-lg border border-dashed border-slate-200 py-2.5 text-sm text-slate-500 transition-colors duration-150 hover:border-brand-300 hover:text-brand-600"
+        className="w-full rounded-lg border border-dashed border-slate-200 py-2.5 text-sm text-slate-500 transition-colors hover:border-brand-300 hover:text-brand-600"
         onClick={() =>
           setNodes([
             ...nodes,
@@ -184,17 +182,22 @@ function LoopSubflowEditor({
 const REQUIRED_MSG = "此项为必填，运行前请填写";
 
 export default function NodeConfigPanel() {
-  const { nodes, selectedId, updateNodeLabel, updateNodeConfig, removeNode } = useEditorStore();
+  const { nodes, edges, selectedId, updateNodeLabel, updateNodeConfig, removeNode } = useEditorStore();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const node = nodes.find((n) => n.id === selectedId);
+  const vars = useMemo(
+    () => (node ? collectUpstreamVars(nodes as never, edges as never, node.id) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [node?.id, nodes, edges]
+  );
 
   if (!node) {
     return (
       <div className="p-5 text-sm text-slate-400">
         点击画布中的节点进行配置；点击空白处取消选择。
-        <div className="mt-4 rounded-xl bg-slate-50 p-3.5 text-xs leading-5 text-slate-500">
-          模板变量语法：{"{{nodeId.field}}"}，例如 {"{{llm-1.text}}"}、{"{{input.topic}}"}。
-          条件表达式示例：{"{{score}} > 0.8"}。
+        <div className="mt-4 rounded-xl bg-slate-50 p-3.5 text-xs leading-6 text-slate-500">
+          <p className="font-semibold text-slate-600">不用记任何语法</p>
+          <p>需要引用前面的结果时，点输入框上方的「+ 插入变量」，选一个就行。</p>
         </div>
       </div>
     );
@@ -205,6 +208,19 @@ export default function NodeConfigPanel() {
   const cfg = node.data.config || {};
   const set = (patch: FlowNodeConfig) => updateNodeConfig(node.id, { ...cfg, ...patch });
   const blank = (v: unknown) => !String(v ?? "").trim();
+
+  // HTTP headers：对象用键值编辑器，解析失败的字符串回退为文本框
+  const headersObj = (() => {
+    const h = cfg.headers;
+    if (!h) return {};
+    if (typeof h === "object") return h as Record<string, string>;
+    try {
+      const o = JSON.parse(h as string);
+      return typeof o === "object" && o ? o : null;
+    } catch {
+      return null;
+    }
+  })();
 
   return (
     <div className="flex h-full flex-col">
@@ -218,46 +234,70 @@ export default function NodeConfigPanel() {
           value={node.data.label}
           onChange={(e) => updateNodeLabel(node.id, e.target.value)}
         />
-        <p className="mt-1.5 text-[11px] text-slate-400">节点 ID：{node.id}（模板中引用输出时使用）</p>
+        <p className="mt-1.5 text-[11px] text-slate-400">节点 ID：{node.id}</p>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4">
         {type === "trigger-manual" && (
-          <p className="text-sm leading-6 text-slate-500">
-            手动触发：运行时可传入 JSON 作为 input，模板中用 {"{{input.xxx}}"} 引用。
-          </p>
+          <div className="rounded-xl bg-slate-50 p-3.5 text-[13px] leading-6 text-slate-600">
+            <p className="font-semibold text-slate-700">这是工作流的起点</p>
+            <p className="mt-1">
+              点「运行」时会让你填一段输入（JSON），后面的节点点「插入变量」就能用里面的内容。
+            </p>
+            <p className="mt-2 font-mono text-xs text-slate-500">
+              比如输入 {"{"}"topic": "AI Agent"{"}"}，后面用 {"{{input.topic}}"} 引用
+            </p>
+          </div>
         )}
 
         {type === "trigger-schedule" && (
-          <Field label="Cron 表达式（UTC）" hint="5 字段：分 时 日 月 周，例如 0 9 * * * 表示每天 9 点">
-            <input className="input font-mono" value={String(cfg.cron || "")} onChange={(e) => set({ cron: e.target.value })} />
+          <Field label="什么时候自动运行">
+            <ScheduleBuilder value={String(cfg.cron || "")} onChange={(v) => set({ cron: v })} />
           </Field>
         )}
 
         {type === "llm" && (
           <>
-            <SectionTitle>模型参数</SectionTitle>
-            <Field label="模型（留空用默认）" hint="覆盖环境变量中的默认模型">
-              <input className="input font-mono" value={String(cfg.model || "")} onChange={(e) => set({ model: e.target.value })} placeholder="gpt-4o-mini" />
+            <SectionTitle>模型</SectionTitle>
+            <Field label="用哪个模型">
+              <ModelPicker value={String(cfg.model || "")} onChange={(v) => set({ model: v })} />
             </Field>
-            <div className="flex gap-3">
-              <Field label="Temperature">
-                <input className="input" type="number" step="0.1" min="0" max="2" value={Number(cfg.temperature ?? 0.7)} onChange={(e) => set({ temperature: Number(e.target.value) })} />
-              </Field>
-              <Field label="Max Tokens">
-                <input className="input" type="number" min="1" max={128000} value={Number(cfg.maxTokens ?? 2048)} onChange={(e) => set({ maxTokens: Number(e.target.value) })} />
-              </Field>
-            </div>
+            <Field label="回答风格">
+              <TemperatureSlider value={Number(cfg.temperature ?? 0.7)} onChange={(v) => set({ temperature: v })} />
+            </Field>
+            <Field label="回复长度上限" hint="单位 token，约等于汉字数，默认 2048">
+              <input
+                className="input"
+                type="number"
+                min={1}
+                max={128000}
+                value={Number(cfg.maxTokens ?? 2048)}
+                onChange={(e) => set({ maxTokens: Number(e.target.value) })}
+              />
+            </Field>
             <SectionTitle>提示词</SectionTitle>
-            <Field label="System Prompt">
-              <textarea className="input" rows={3} value={String(cfg.systemPrompt || "")} onChange={(e) => set({ systemPrompt: e.target.value })} />
+            <Field label="角色设定（可选）" hint="比如：你是一位资深中文营销文案专家">
+              <textarea
+                className="input"
+                rows={2}
+                value={String(cfg.systemPrompt || "")}
+                onChange={(e) => set({ systemPrompt: e.target.value })}
+                placeholder="你是一位…"
+              />
             </Field>
             <Field
-              label="Prompt（支持 {{变量}}）"
+              label="提示词"
               required
+              hint="告诉 AI 做什么。点「插入变量」把前面的结果放进来"
               error={blank(cfg.prompt) ? REQUIRED_MSG : undefined}
             >
-              <textarea className="input" rows={6} value={String(cfg.prompt || "")} onChange={(e) => set({ prompt: e.target.value })} />
+              <TemplateTextarea
+                rows={6}
+                vars={vars}
+                value={String(cfg.prompt || "")}
+                onChange={(v) => set({ prompt: v })}
+                placeholder="比如：把下面的大纲扩展成一篇文章："
+              />
             </Field>
           </>
         )}
@@ -266,74 +306,114 @@ export default function NodeConfigPanel() {
           <>
             <SectionTitle>请求</SectionTitle>
             <div className="flex gap-3">
-              <Field label="Method">
-                <select className="input" value={String(cfg.method || "GET")} onChange={(e) => set({ method: e.target.value })}>
-                  {["GET", "POST", "PUT", "PATCH", "DELETE"].map((m) => (
-                    <option key={m}>{m}</option>
-                  ))}
-                </select>
-              </Field>
-              <div className="flex-[2]">
-                <Field
-                  label="URL（支持 {{变量}}）"
-                  required
-                  error={blank(cfg.url) ? REQUIRED_MSG : undefined}
-                >
-                  <input className="input font-mono" value={String(cfg.url || "")} onChange={(e) => set({ url: e.target.value })} />
+              <div className="w-28 shrink-0">
+                <Field label="方式">
+                  <select className="input" value={String(cfg.method || "GET")} onChange={(e) => set({ method: e.target.value })}>
+                    {["GET", "POST", "PUT", "PATCH", "DELETE"].map((m) => (
+                      <option key={m}>{m}</option>
+                    ))}
+                  </select>
+                </Field>
+              </div>
+              <div className="min-w-0 flex-1">
+                <Field label="网址" required error={blank(cfg.url) ? REQUIRED_MSG : undefined}>
+                  <TemplateInput
+                    vars={vars}
+                    mono
+                    value={String(cfg.url || "")}
+                    onChange={(v) => set({ url: v })}
+                    placeholder="https://api.example.com/xxx"
+                  />
                 </Field>
               </div>
             </div>
-            <Field label="Headers（JSON）">
-              <textarea
-                className="input font-mono text-xs"
-                rows={3}
-                value={typeof cfg.headers === "string" ? (cfg.headers as string) : JSON.stringify(cfg.headers || {}, null, 2)}
-                onChange={(e) => set({ headers: e.target.value })}
-              />
+            <Field label="请求头（一般不用填）">
+              {headersObj === null ? (
+                <TemplateTextarea
+                  rows={3}
+                  vars={vars}
+                  value={String(cfg.headers || "")}
+                  onChange={(v) => set({ headers: v })}
+                />
+              ) : (
+                <KVEditor vars={vars} value={headersObj} onChange={(v) => set({ headers: v })} valuePlaceholder="比如：Bearer xxx" />
+              )}
             </Field>
-            <Field label="Body（支持 {{变量}}）">
-              <textarea className="input font-mono text-xs" rows={4} value={String(cfg.body || "")} onChange={(e) => set({ body: e.target.value })} />
+            <Field label="请求内容" hint="GET 请求不用填；POST 等把要发送的内容写在这里">
+              <TemplateTextarea
+                rows={4}
+                vars={vars}
+                value={String(cfg.body || "")}
+                onChange={(v) => set({ body: v })}
+                placeholder='{"text": "要发送的内容"}'
+              />
             </Field>
             <SectionTitle>高级</SectionTitle>
             <div className="flex items-center gap-3">
-              <Field label="超时 ms">
-                <input className="input" type="number" value={Number(cfg.timeoutMs ?? 30000)} onChange={(e) => set({ timeoutMs: Number(e.target.value) })} />
+              <Field label="超时（秒）">
+                <input
+                  className="input"
+                  type="number"
+                  min={1}
+                  max={300}
+                  value={Math.round(Number(cfg.timeoutMs ?? 30000) / 1000)}
+                  onChange={(e) => set({ timeoutMs: Math.max(1, Number(e.target.value) || 30) * 1000 })}
+                />
               </Field>
               <label className="mt-5 flex shrink-0 items-center gap-1.5 text-sm text-slate-600">
-                <input type="checkbox" checked={cfg.failOnError !== false} onChange={(e) => set({ failOnError: e.target.checked })} />
-                非 2xx 视为失败
+                <input
+                  type="checkbox"
+                  checked={cfg.failOnError !== false}
+                  onChange={(e) => set({ failOnError: e.target.checked })}
+                />
+                报错时停下来
               </label>
             </div>
           </>
         )}
 
         {type === "condition" && (
-          <Field
-            label="条件表达式"
-            required
-            error={blank(cfg.expression) ? REQUIRED_MSG : undefined}
-            hint="支持 {{变量}} 与比较：==, !=, >, <, >=, <=, contains。例如：{{score}} > 0.8"
-          >
-            <input className="input font-mono" value={String(cfg.expression || "")} onChange={(e) => set({ expression: e.target.value })} placeholder="{{score}} > 0.8" />
+          <Field label="什么时候走「是」分支" hint="比如：上一步的分数大于 0.8，就走「是」，否则走「否」">
+            <ConditionBuilder value={String(cfg.expression || "")} onChange={(v) => set({ expression: v })} vars={vars} />
           </Field>
         )}
 
         {type === "loop" && (
           <>
             <SectionTitle>循环设置</SectionTitle>
-            <Field label="Items（JSON 数组或 {{变量}}）" hint="例如：{{trigger-1.list}} 或 [&quot;a&quot;,&quot;b&quot;]">
-              <textarea className="input font-mono text-xs" rows={3} value={String(cfg.items ?? "[]")} onChange={(e) => set({ items: e.target.value })} />
+            <Field
+              label="循环处理哪些内容"
+              hint="点「插入变量」选上游的数组，比如搜到的文档块"
+            >
+              <TemplateTextarea
+                rows={3}
+                vars={vars}
+                value={String(cfg.items ?? "")}
+                onChange={(v) => set({ items: v })}
+                placeholder="{{rag-1.chunks}}"
+              />
             </Field>
             <div className="flex gap-3">
-              <Field label="单项变量名">
-                <input className="input" value={String(cfg.itemVar || "item")} onChange={(e) => set({ itemVar: e.target.value })} />
+              <Field label="最多循环几次" hint="防止死循环">
+                <input
+                  className="input"
+                  type="number"
+                  min={1}
+                  max={100}
+                  value={Number(cfg.maxIterations ?? 25)}
+                  onChange={(e) => set({ maxIterations: Number(e.target.value) })}
+                />
               </Field>
-              <Field label="最大迭代数">
-                <input className="input" type="number" min="1" max="100" value={Number(cfg.maxIterations ?? 25)} onChange={(e) => set({ maxIterations: Number(e.target.value) })} />
+              <Field label="每一项叫什么" hint="子流程里用 {{item}} 表示当前项，一般不用改">
+                <input
+                  className="input"
+                  value={String(cfg.itemVar || "item")}
+                  onChange={(e) => set({ itemVar: e.target.value })}
+                />
               </Field>
             </div>
-            <SectionTitle>内部子流程</SectionTitle>
-            <LoopSubflowEditor config={cfg} onChange={(c) => updateNodeConfig(node.id, c)} />
+            <SectionTitle>对每一项做什么</SectionTitle>
+            <LoopSubflowEditor config={cfg} onChange={(c) => updateNodeConfig(node.id, c)} outerVars={vars} />
           </>
         )}
 
@@ -341,44 +421,86 @@ export default function NodeConfigPanel() {
           <>
             <SectionTitle>检索设置</SectionTitle>
             <Field
-              label="检索 Query（支持 {{变量}}）"
+              label="要搜什么"
               required
+              hint="写一句话，或点「插入变量」用上游的内容来搜"
               error={blank(cfg.query) ? REQUIRED_MSG : undefined}
             >
-              <textarea className="input" rows={3} value={String(cfg.query || "")} onChange={(e) => set({ query: e.target.value })} />
+              <TemplateTextarea
+                rows={3}
+                vars={vars}
+                value={String(cfg.query || "")}
+                onChange={(v) => set({ query: v })}
+                placeholder="比如：产品的退货政策"
+              />
             </Field>
-            <div className="flex gap-3">
-              <Field label="Top K">
-                <input className="input" type="number" min="1" max="50" value={Number(cfg.topK ?? 5)} onChange={(e) => set({ topK: Number(e.target.value) })} />
-              </Field>
-              <Field label="最低相似度">
-                <input className="input" type="number" step="0.05" min="0" max="1" value={Number(cfg.minScore ?? 0)} onChange={(e) => set({ minScore: Number(e.target.value) })} />
-              </Field>
-            </div>
-            <p className="text-[11px] leading-4 text-slate-400">先在「知识库」中上传文档 chunk，检索结果为 {"{{nodeId.chunks}}"}（含 content / similarity）。</p>
+            <Field label={`取几条结果：${Number(cfg.topK ?? 5)} 条`}>
+              <input
+                type="range"
+                min={1}
+                max={50}
+                value={Number(cfg.topK ?? 5)}
+                onChange={(e) => set({ topK: Number(e.target.value) })}
+                className="w-full accent-brand-600"
+              />
+            </Field>
+            <Field label={`相似度门槛：${Number(cfg.minScore ?? 0).toFixed(2)}`} hint="0 = 不限制，越高越严格">
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.05}
+                value={Number(cfg.minScore ?? 0)}
+                onChange={(e) => set({ minScore: Number(e.target.value) })}
+                className="w-full accent-brand-600"
+              />
+            </Field>
+            <p className="text-[11px] leading-5 text-slate-400">
+              先在「知识库」里上传文档。搜到的结果叫 {"{{节点ID.chunks}}"}，点「插入变量」就能用。
+            </p>
           </>
         )}
 
         {type === "human-approval" && (
           <>
             <SectionTitle>审批设置</SectionTitle>
-            <Field label="审批标题">
-              <input className="input" value={String(cfg.title || "")} onChange={(e) => set({ title: e.target.value })} />
+            <Field label="审批标题" hint="比如：审核营销文案">
+              <input
+                className="input"
+                value={String(cfg.title || "")}
+                onChange={(e) => set({ title: e.target.value })}
+                placeholder="审核营销文案"
+              />
             </Field>
-            <Field label="说明（支持 {{变量}}）">
-              <textarea className="input" rows={4} value={String(cfg.message || "")} onChange={(e) => set({ message: e.target.value })} />
+            <Field label="给审批人看什么" hint="把需要审批的内容写清楚，点「插入变量」把 AI 生成的结果放进来">
+              <TemplateTextarea
+                rows={4}
+                vars={vars}
+                value={String(cfg.message || "")}
+                onChange={(v) => set({ message: v })}
+                placeholder="初稿已生成，请审核："
+              />
             </Field>
-            <Field label="超时（小时），超时视为拒绝">
-              <input className="input" type="number" min="1" max="720" value={Number(cfg.timeoutHours ?? 24)} onChange={(e) => set({ timeoutHours: Number(e.target.value) })} />
+            <Field label="超时自动拒绝（小时）">
+              <input
+                className="input"
+                type="number"
+                min={1}
+                max={720}
+                value={Number(cfg.timeoutHours ?? 24)}
+                onChange={(e) => set({ timeoutHours: Number(e.target.value) })}
+              />
             </Field>
           </>
         )}
 
         {type === "output" && (
-          <Field label="输出字段（字段名 → 模板）" hint="最终结果将合并所有 output 节点的字段">
+          <Field label="输出哪些内容" hint="运行结束后，这里列的内容就是最终结果">
             <KVEditor
+              vars={vars}
               value={(cfg.fields as Record<string, string>) || {}}
               onChange={(v) => set({ fields: v })}
+              valuePlaceholder="点「插入变量」选上游结果"
             />
           </Field>
         )}

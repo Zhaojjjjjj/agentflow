@@ -1,23 +1,17 @@
 import { NextResponse } from "next/server";
-import { timingSafeEqual, createHash } from "node:crypto";
 import {
   createSession,
-  getAdminUsername,
   isJwtConfigured,
   isLoginConfigured,
   isProduction,
   sessionCookieAttrs,
 } from "@/lib/auth";
+import { verifyPassword } from "@/lib/password";
+import { ensureSeeded, getUserByUsername } from "@/lib/users";
 
 export const dynamic = "force-dynamic";
 
-/** Compare in constant time (hash first so unequal lengths don't leak). */
-function safeEqual(input: string, expected: string): boolean {
-  const a = createHash("sha256").update(input, "utf8").digest();
-  const b = createHash("sha256").update(expected, "utf8").digest();
-  return timingSafeEqual(a, b);
-}
-
+/** Multi-user login: verifies against the users table (admin seeded from env on first use). */
 export async function POST(req: Request) {
   if (!isLoginConfigured()) {
     return NextResponse.json(
@@ -32,19 +26,33 @@ export async function POST(req: Request) {
     );
   }
   const body = await req.json().catch(() => ({}));
-  const username = typeof body.username === "string" ? body.username : "";
+  const username = typeof body.username === "string" ? body.username.trim() : "";
   const password = typeof body.password === "string" ? body.password : "";
-  // Verify both fields; generic message never reveals which one was wrong.
-  const ok =
-    username.length > 0 &&
-    password.length > 0 &&
-    safeEqual(username, getAdminUsername()) &&
-    safeEqual(password, process.env.ADMIN_PASSWORD!);
-  if (!ok) {
+  if (!username || !password) {
     return NextResponse.json({ error: "用户名或密码错误" }, { status: 401 });
   }
-  const token = await createSession();
-  const res = NextResponse.json({ ok: true });
+
+  try {
+    await ensureSeeded();
+  } catch (e) {
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : "初始化用户表失败" },
+      { status: 503 }
+    );
+  }
+
+  // Generic message never reveals whether the username exists.
+  const user = await getUserByUsername(username).catch(() => null);
+  const ok = user && (await verifyPassword(password, user.password_hash));
+  if (!ok || !user) {
+    return NextResponse.json({ error: "用户名或密码错误" }, { status: 401 });
+  }
+
+  const token = await createSession({ id: user.id, username: user.username, role: user.role });
+  const res = NextResponse.json({
+    ok: true,
+    user: { id: user.id, username: user.username, role: user.role, avatar_url: user.avatar_url },
+  });
   const { name, ...attrs } = sessionCookieAttrs({ secure: isProduction() });
   res.cookies.set(name, token, attrs);
   return res;

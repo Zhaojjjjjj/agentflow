@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabase } from "@/lib/supabase";
+import { authUser, unauthorized, canAccessWorkflow } from "@/lib/access";
 import { inngest, EVENTS } from "@/lib/inngest";
 
 export const dynamic = "force-dynamic";
@@ -8,12 +9,17 @@ type Params = { params: Promise<{ id: string }> };
 
 /** Approve or reject a run that is paused at a human-approval node. */
 export async function POST(req: NextRequest, { params }: Params) {
+  const me = await authUser(req);
+  if (!me) return unauthorized();
   const { id: runId } = await params;
+  const sb = getSupabase();
+  const { data: run } = await sb.from("workflow_runs").select("workflow_id").eq("id", runId).maybeSingle();
+  if (!run || !(await canAccessWorkflow((run as { workflow_id: string }).workflow_id, me))) {
+    return NextResponse.json({ error: "运行记录不存在" }, { status: 404 });
+  }
   const body = await req.json().catch(() => ({}));
   const decision = body.decision === "approved" ? "approved" : "rejected";
   const comment = typeof body.comment === "string" ? body.comment.slice(0, 500) : "";
-
-  const sb = getSupabase();
   const { data: waiting } = await sb
     .from("run_steps")
     .select("id, node_id")

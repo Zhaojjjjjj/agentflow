@@ -1,12 +1,19 @@
 import { NextRequest } from "next/server";
 import { getSupabase } from "@/lib/supabase";
+import { authUser, canAccessWorkflow } from "@/lib/access";
 
 export const dynamic = "force-dynamic";
 
 /** SSE: polls Supabase for run + step updates and streams them to the browser. */
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const sb = getSupabase();
+  const me = await authUser(req);
+  if (!me) return new Response(JSON.stringify({ error: "未登录" }), { status: 401 });
+  const { data: own } = await sb.from("workflow_runs").select("workflow_id").eq("id", id).maybeSingle();
+  if (!own || !(await canAccessWorkflow((own as { workflow_id: string }).workflow_id, me))) {
+    return new Response(JSON.stringify({ error: "运行记录不存在" }), { status: 404 });
+  }
 
   let lastPayload = "";
   let polls = 0;

@@ -2,18 +2,24 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import LogoutButton from "./LogoutButton";
+import UserMenu, { useMe } from "./UserMenu";
 import CommandPalette from "./CommandPalette";
-
-const NAV = [
-  { href: "/", label: "工作流" },
-  { href: "/api-keys", label: "API Keys" },
-  { href: "/settings", label: "LLM 设置" },
-];
 
 export default function TopNav() {
   const pathname = usePathname();
+  const me = useMe();
   const openPalette = () => window.dispatchEvent(new Event("agentflow:open-palette"));
+
+  const NAV = [
+    { href: "/", label: "工作流" },
+    { href: "/api-keys", label: "API Keys" },
+    ...(me?.role === "admin"
+      ? [
+          { href: "/admin", label: "数据统计" },
+          { href: "/settings", label: "LLM 设置" },
+        ]
+      : []),
+  ];
 
   return (
     <>
@@ -55,7 +61,15 @@ export default function TopNav() {
               <span>搜索…</span>
               <kbd className="kbd">⌘K</kbd>
             </button>
-            <LogoutButton />
+            {me ? (
+              <UserMenu user={me} />
+            ) : (
+              me === null && (
+                <Link href="/login" className="btn-secondary">
+                  登录
+                </Link>
+              )
+            )}
           </div>
         </div>
       </header>
