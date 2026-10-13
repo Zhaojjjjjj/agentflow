@@ -64,7 +64,7 @@ export default function RunDetailPage({ params }: { params: Promise<{ runId: str
           const j = JSON.parse(e.data);
           if (j.type === "update" || j.type === "done") {
             setRun(j.run);
-            if (j.steps) setSteps(j.steps);
+            if (j.steps && j.steps.length > 0) setSteps(j.steps);
           }
           if (j.type === "done") es.close();
         } catch {
