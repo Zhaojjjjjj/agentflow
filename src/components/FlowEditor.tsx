@@ -354,7 +354,24 @@ function EditorInner({ workflowId }: { workflowId: string }) {
         </aside>
       </div>
 
-      <RunDialog open={runOpen} onClose={() => setRunOpen(false)} onRun={run} />
+  /** 需要 Inngest 异步执行的节点类型：人工审批（要等人）、定时触发 */
+  const needsAsync = nodes.some((n) =>
+    ["human-approval", "trigger-schedule"].includes(
+      (n.data as { nodeType?: string } | undefined)?.nodeType ?? ""
+    )
+  );
+
+      <RunDialog
+        open={runOpen}
+        onClose={() => setRunOpen(false)}
+        onRun={run}
+        suggestedMode={needsAsync ? "async" : "sync"}
+        suggestReason={
+          needsAsync
+            ? "检测到人工审批或定时触发节点，需要 Inngest 异步执行。"
+            : "未检测到审批/定时节点，已为你选择更快的同步执行。"
+        }
+      />
       <KnowledgeBase workflowId={workflowId} open={kbOpen} onClose={() => setKbOpen(false)} />
 
       {/* publish / api info */}
