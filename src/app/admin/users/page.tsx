@@ -35,7 +35,7 @@ function CredentialShare({
     setOrigin(window.location.origin);
   }, []);
   if (!info) return null;
-  const text = `agentflow 控制台登录信息\n登录地址：${origin}/login\n账号：${info.username}\n密码：${info.password}`;
+  const text = `AgentFlow 控制台登录信息\n登录地址：${origin}/login\n账号：${info.username}\n密码：${info.password}`;
   return (
     <Modal open={!!info} onClose={onClose} title="用户已创建">
       <div className="rounded-xl border border-green-200 bg-green-50/60 p-4">

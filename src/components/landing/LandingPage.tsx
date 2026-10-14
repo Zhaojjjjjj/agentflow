@@ -189,7 +189,7 @@ export default function LandingPage() {
         <div className="mx-auto flex h-16 max-w-6xl items-center px-6">
           <span className="flex items-center gap-2">
             <span className="h-2.5 w-2.5 rounded-full bg-[#7C3AED]" />
-            <span className="text-[15px] font-semibold tracking-tight">agentflow</span>
+            <span className="text-[15px] font-semibold tracking-tight">AgentFlow</span>
           </span>
           <nav className="ml-10 hidden items-center gap-7 text-sm text-white/50 md:flex">
             <a href="#features" className="transition-colors hover:text-white">特性</a>
@@ -458,7 +458,7 @@ export default function LandingPage() {
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-6 py-8 md:flex-row">
           <span className="flex items-center gap-2 text-xs text-white/40">
             <span className="h-2 w-2 rounded-full bg-[#7C3AED]" />
-            agentflow · 可视化 AI Agent 工作流编排平台
+            AgentFlow · 可视化 AI Agent 工作流编排平台
           </span>
           <span className="font-mono text-[11px] uppercase tracking-[0.18em] text-white/30">
             MIT · Next.js · Inngest · Supabase

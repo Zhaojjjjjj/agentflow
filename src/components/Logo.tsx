@@ -7,7 +7,7 @@
  */
 export default function Logo({ size = 28 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 64 64" aria-label="agentflow" role="img">
+    <svg width={size} height={size} viewBox="0 0 64 64" aria-label="AgentFlow" role="img">
       <rect x="2" y="2" width="60" height="60" rx="16" fill="#7C3AED" />
       <path
         d="M47.0 34.0 A15 15 0 1 1 39.5 21.0"

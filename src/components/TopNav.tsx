@@ -28,7 +28,7 @@ export default function TopNav() {
         <div className="mx-auto flex h-14 max-w-6xl items-stretch gap-6 px-6">
           <Link href="/" className="flex shrink-0 items-center gap-2">
             <Logo size={26} />
-            <span className="text-[15px] font-semibold tracking-tight text-slate-900">agentflow</span>
+            <span className="text-[15px] font-semibold tracking-tight text-slate-900">AgentFlow</span>
           </Link>
           <nav className="flex items-stretch gap-1">
             {NAV.map((n) => {

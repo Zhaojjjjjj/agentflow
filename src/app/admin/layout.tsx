@@ -46,7 +46,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <div className="flex items-center gap-2.5 px-5 pb-5 pt-6">
           <Logo size={30} />
           <div>
-            <p className="text-[15px] font-semibold tracking-tight text-slate-900">agentflow</p>
+            <p className="text-[15px] font-semibold tracking-tight text-slate-900">AgentFlow</p>
             <p className="text-[11px] text-slate-400">管理后台</p>
           </div>
         </div>

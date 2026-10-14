@@ -3,7 +3,7 @@ import "./globals.css";
 import { Toaster } from "@/components/toast";
 
 export const metadata: Metadata = {
-  title: "agentflow · Agent 工作流编排平台",
+  title: "AgentFlow · Agent 工作流编排平台",
   description: "可视化 AI Agent 工作流编排与执行平台",
 };
 

@@ -68,7 +68,7 @@ function VisualPanel() {
         <div>
           <div className="flex items-center gap-3">
             <span className="h-4 w-4 rounded-full bg-[#7C3AED]" />
-            <span className="text-4xl font-semibold tracking-tight text-white">agentflow</span>
+            <span className="text-4xl font-semibold tracking-tight text-white">AgentFlow</span>
           </div>
           <p className="mt-5 max-w-sm text-[15px] leading-7 text-white/55">
             可视化编排 AI Agent 工作流——从拖拽节点，到可靠执行，到一键发布为 API。
@@ -159,7 +159,7 @@ function LoginForm() {
         <div className="relative z-10 flex h-full items-center px-6">
           <div className="flex items-center gap-2.5">
             <span className="h-3 w-3 rounded-full bg-[#7C3AED]" />
-            <span className="text-2xl font-semibold tracking-tight text-white">agentflow</span>
+            <span className="text-2xl font-semibold tracking-tight text-white">AgentFlow</span>
           </div>
         </div>
       </div>
@@ -239,7 +239,7 @@ function LoginForm() {
           </form>
 
           <p className="mt-8 text-center font-mono text-[11px] text-slate-400">
-            agentflow · MIT
+            AgentFlow · MIT
           </p>
         </div>
       </div>
