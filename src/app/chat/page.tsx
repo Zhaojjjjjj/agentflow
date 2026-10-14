@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import TopNav from "@/components/TopNav";
+import Logo from "@/components/Logo";
 import { useMe } from "@/components/UserMenu";
 import { Markdown, Skeleton } from "@/components/ui";
 import { toast } from "@/components/toast";
@@ -17,7 +18,33 @@ interface Message {
   content: string;
 }
 
-const SUGGESTIONS = ["帮我写一段工作周报", "解释一下什么是 RAG", "给我 3 个提高工作效率的建议"];
+/** AI 助手 —— Web 端问答入口 */
+const CHAT_NAME = "AI 助手";
+
+const SUGGESTION_POOL = [
+  "帮我写一段工作周报",
+  "解释一下什么是 RAG",
+  "给我 3 个提高工作效率的建议",
+  "用一句话讲清楚什么是 Agent",
+  "帮我润色这段自我介绍",
+  "推荐 5 本值得读的技术书",
+  "写一个 Python 快速排序",
+  "怎么用一句话介绍我的项目",
+  "帮我想一个产品 slogan",
+  "解释一下 SSE 和 WebSocket 的区别",
+  "给我今天的工作计划建议",
+  "什么是 prompt 工程，有哪些技巧",
+];
+
+function pickSuggestions(n: number): string[] {
+  const pool = [...SUGGESTION_POOL];
+  const out: string[] = [];
+  while (out.length < n && pool.length > 0) {
+    const i = Math.floor(Math.random() * pool.length);
+    out.push(pool.splice(i, 1)[0]);
+  }
+  return out;
+}
 
 function parseSSE(chunk: string): { event: string; data: string }[] {
   const out: { event: string; data: string }[] = [];
@@ -46,6 +73,9 @@ export default function ChatPage() {
   const [listLoading, setListLoading] = useState(true);
   const bottomRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  // 每次回到空态（新对话）都重新随机抽 3 个推荐问题
+  const [suggestSeed, setSuggestSeed] = useState(0);
+  const suggestions = useMemo(() => pickSuggestions(3), [suggestSeed]);
 
   const scrollBottom = useCallback(() => {
     requestAnimationFrame(() => bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" }));
@@ -91,6 +121,7 @@ export default function ChatPage() {
     setCurrentId(null);
     setMessages([]);
     setStreaming(false);
+    setSuggestSeed((s) => s + 1);
   }, []);
 
   const deleteConversation = useCallback(
@@ -201,7 +232,7 @@ export default function ChatPage() {
               ＋ 新对话
             </button>
           </div>
-          <div className="flex-1 overflow-y-auto px-2">
+          <div className="chat-scroll flex-1 overflow-y-auto px-2">
             {listLoading ? (
               <Skeleton rows={4} />
             ) : conversations.length === 0 ? (
@@ -234,7 +265,11 @@ export default function ChatPage() {
 
         {/* 主对话区 */}
         <main className="flex min-w-0 flex-1 flex-col">
-          <div className="flex-1 overflow-y-auto px-6 py-6">
+          <header className="flex items-center gap-2.5 border-b border-slate-200/70 px-6 py-3">
+            <Logo size={24} />
+            <h1 className="text-sm font-semibold text-slate-800">{CHAT_NAME}</h1>
+          </header>
+          <div className="chat-scroll flex-1 overflow-y-auto px-6 py-6">
             {loading ? (
               <Skeleton rows={5} />
             ) : messages.length === 0 ? (
@@ -246,7 +281,7 @@ export default function ChatPage() {
                   我是你的 AI 助手，有什么可以帮你的？
                 </p>
                 <div className="mt-8 grid w-full gap-2.5 sm:grid-cols-3">
-                  {SUGGESTIONS.map((s) => (
+                  {suggestions.map((s) => (
                     <button
                       key={s}
                       onClick={() => void send(s)}
@@ -269,8 +304,8 @@ export default function ChatPage() {
                     </div>
                   ) : (
                     <div key={m.id} className="flex gap-3">
-                      <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-100 text-xs font-bold text-brand-700">
-                        AI
+                      <span className="mt-0.5 shrink-0">
+                        <Logo size={28} />
                       </span>
                       <div className="markdown-body min-w-0 max-w-[90%] flex-1 rounded-2xl rounded-tl-md bg-slate-50 px-4 py-3 text-sm leading-7 text-slate-800">
                         {m.content ? (

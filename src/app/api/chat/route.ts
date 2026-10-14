@@ -91,8 +91,14 @@ export async function POST(req: NextRequest) {
   const stream = new ReadableStream({
     async start(controller) {
       const enc = new TextEncoder();
+      let closed = false;
       const send = (event: string, data: string) => {
-        controller.enqueue(enc.encode(`event: ${event}\ndata: ${data}\n\n`));
+        if (closed) return;
+        try {
+          controller.enqueue(enc.encode(`event: ${event}\ndata: ${data}\n\n`));
+        } catch {
+          closed = true; // 客户端已断开（点了停止/关页面），后面的只入库不推送
+        }
       };
       send("conversation", JSON.stringify({ conversationId }));
       let full = "";
@@ -108,23 +114,26 @@ export async function POST(req: NextRequest) {
           },
           providers
         );
-        // 存助手回复
-        if (full) {
-          await sb.from("chat_messages").insert({
-            conversation_id: conversationId,
-            role: "assistant",
-            content: full,
-          });
-          await sb
-            .from("chat_conversations")
-            .update({ updated_at: new Date().toISOString() })
-            .eq("id", conversationId);
-        }
-        send("done", JSON.stringify({}));
       } catch (e) {
         send("error", JSON.stringify({ error: e instanceof Error ? e.message : "对话失败" }));
-      } finally {
+      }
+      // 无论客户端是否断开，有内容就入库（点了"停止"的部分回答也保留）
+      if (full) {
+        await sb.from("chat_messages").insert({
+          conversation_id: conversationId,
+          role: "assistant",
+          content: full,
+        });
+        await sb
+          .from("chat_conversations")
+          .update({ updated_at: new Date().toISOString() })
+          .eq("id", conversationId);
+      }
+      send("done", JSON.stringify({}));
+      try {
         controller.close();
+      } catch {
+        /* 已断开 */
       }
     },
   });
