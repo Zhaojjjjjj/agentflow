@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Inter, Instrument_Serif } from "next/font/google";
 import { NODE_META, type NodeType } from "@/lib/engine/types";
 import WorkflowDemo from "./WorkflowDemo";
+import DagFlowMini from "./DagFlowMini";
 import Reveal from "./Reveal";
 import CopyButton from "./CopyButton";
 
@@ -43,29 +44,8 @@ function SectionHead({
   );
 }
 
-/* 特性卡内的迷你示意图（纯 SVG 线条，非图标堆砌） */
-
-function DagMini() {
-  return (
-    <svg viewBox="0 0 200 72" className="mt-6 w-full" aria-hidden>
-      {[
-        { x: 8, y: 26 },
-        { x: 78, y: 8 },
-        { x: 78, y: 46 },
-        { x: 148, y: 26 },
-      ].map((n, i) => (
-        <rect key={i} x={n.x} y={n.y} width={44} height={20} rx={6} fill="rgba(15,23,42,0.03)" stroke="rgba(15,23,42,0.12)" />
-      ))}
-      <path d="M52 36 C 62 36, 66 18, 78 18" fill="none" stroke="rgba(124,58,237,0.55)" strokeWidth={1.2} />
-      <path d="M52 36 C 62 36, 66 56, 78 56" fill="none" stroke="rgba(124,58,237,0.55)" strokeWidth={1.2} />
-      <path d="M122 18 C 134 18, 136 32, 148 32" fill="none" stroke="rgba(124,58,237,0.55)" strokeWidth={1.2} />
-      <path d="M122 56 C 134 56, 136 40, 148 40" fill="none" stroke="rgba(124,58,237,0.55)" strokeWidth={1.2} />
-      <circle cx={170} cy={36} r={2.5} fill="#7C3AED">
-        <animateMotion dur="2.4s" repeatCount="indefinite" path="M52 36 C 62 36, 66 18, 78 18 M122 18 C 134 18, 136 32, 148 32" />
-      </circle>
-    </svg>
-  );
-}
+/* 特性卡内的迷你示意图（纯 SVG 线条，非图标堆砌）
+   可视化编排卡用 DagFlowMini：节点依次点亮的流动画 */
 
 function RetryMini() {
   return (
@@ -132,7 +112,7 @@ const BENTO: {
     title: "可视化编排",
     desc: "拖拽画布编排 DAG：条件分支、循环、子流程一次画清，复杂 Agent 逻辑一目了然。",
     large: true,
-    art: <DagMini />,
+    art: <DagFlowMini />,
   },
   {
     title: "可靠执行",
