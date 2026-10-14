@@ -58,13 +58,13 @@ export default function WorkflowDemo() {
               <path
                 d={d}
                 fill="none"
-                stroke={lit ? "rgba(139,92,246,0.55)" : "rgba(255,255,255,0.10)"}
+                stroke={lit ? "rgba(124,58,237,0.6)" : "rgba(15,23,42,0.12)"}
                 strokeWidth={1.2}
                 className={lit ? "edge-flow" : undefined}
                 style={{ transition: "stroke 400ms" }}
               />
               {lit && (
-                <circle r={2.6} fill="#A78BFA" filter="url(#wf-glow)">
+                <circle r={2.6} fill="#7C3AED" filter="url(#wf-glow)">
                   <animateMotion dur={`${2.6 + i * 0.4}s`} begin={`${-i * 0.8}s`} repeatCount="indefinite" path={d} />
                 </circle>
               )}
@@ -77,7 +77,7 @@ export default function WorkflowDemo() {
           const lit = i <= active;
           const isActive = i === active;
           return (
-            <g key={n.id} opacity={lit ? 1 : 0.3} style={{ transition: "opacity 450ms ease" }}>
+            <g key={n.id} opacity={lit ? 1 : 0.45} style={{ transition: "opacity 450ms ease" }}>
               {isActive && (
                 <rect
                   x={n.x - 5}
@@ -86,8 +86,8 @@ export default function WorkflowDemo() {
                   height={H + 10}
                   rx={15}
                   fill="none"
-                  stroke="#8B5CF6"
-                  strokeOpacity={0.55}
+                  stroke="#7C3AED"
+                  strokeOpacity={0.5}
                   strokeWidth={1.5}
                   filter="url(#wf-glow)"
                 />
@@ -98,19 +98,19 @@ export default function WorkflowDemo() {
                 width={W}
                 height={H}
                 rx={10}
-                fill={isActive ? "#171425" : "#101014"}
-                stroke={isActive ? "#8B5CF6" : "rgba(255,255,255,0.14)"}
+                fill={isActive ? "#F5F3FF" : "#F8FAFC"}
+                stroke={isActive ? "#7C3AED" : "rgba(15,23,42,0.14)"}
                 strokeWidth={1.2}
                 style={{ transition: "stroke 400ms, fill 400ms" }}
               />
-              <circle cx={n.x + 15} cy={n.y + H / 2} r={3} fill={isActive ? "#A78BFA" : "#3F3F46"} />
-              <text x={n.x + 25} y={n.y + 20} fill="#fff" fontSize={12} fontWeight={600}>
+              <circle cx={n.x + 15} cy={n.y + H / 2} r={3} fill={isActive ? "#7C3AED" : "#CBD5E1"} />
+              <text x={n.x + 25} y={n.y + 20} fill="#0F172A" fontSize={12} fontWeight={600}>
                 {n.label}
               </text>
               <text
                 x={n.x + 25}
                 y={n.y + 34}
-                fill="rgba(255,255,255,0.38)"
+                fill="rgba(15,23,42,0.45)"
                 fontSize={8.5}
                 fontFamily="ui-monospace, monospace"
                 letterSpacing={1.5}
@@ -123,7 +123,7 @@ export default function WorkflowDemo() {
       </svg>
 
       {/* live status line */}
-      <div className="mt-3 flex items-center gap-2 border-t border-white/8 pt-3 font-mono text-[11px] tracking-wide text-white/40">
+      <div className="mt-3 flex items-center gap-2 border-t border-slate-200 pt-3 font-mono text-[11px] tracking-wide text-slate-400">
         <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
         <span>
           step {active + 1}/5 · {NODES[active].label} 运行中

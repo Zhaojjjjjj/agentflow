@@ -19,7 +19,7 @@ const GITHUB_URL = "https://github.com/Zhaojjjjjj/agentflow";
 
 function MicroLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="font-mono text-[11px] uppercase tracking-[0.28em] text-white/40">{children}</p>
+    <p className="font-mono text-[11px] uppercase tracking-[0.28em] text-slate-400">{children}</p>
   );
 }
 
@@ -35,10 +35,10 @@ function SectionHead({
   return (
     <Reveal>
       <MicroLabel>{micro}</MicroLabel>
-      <h2 className="mt-4 max-w-2xl text-3xl font-semibold tracking-tight text-white md:text-4xl">
+      <h2 className="mt-4 max-w-2xl text-3xl font-semibold tracking-tight text-slate-900 md:text-4xl">
         {title}
       </h2>
-      {desc && <p className="mt-4 max-w-xl text-[15px] leading-7 text-white/50">{desc}</p>}
+      {desc && <p className="mt-4 max-w-xl text-[15px] leading-7 text-slate-500">{desc}</p>}
     </Reveal>
   );
 }
@@ -54,13 +54,13 @@ function DagMini() {
         { x: 78, y: 46 },
         { x: 148, y: 26 },
       ].map((n, i) => (
-        <rect key={i} x={n.x} y={n.y} width={44} height={20} rx={6} fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.14)" />
+        <rect key={i} x={n.x} y={n.y} width={44} height={20} rx={6} fill="rgba(15,23,42,0.03)" stroke="rgba(15,23,42,0.12)" />
       ))}
-      <path d="M52 36 C 62 36, 66 18, 78 18" fill="none" stroke="rgba(139,92,246,0.6)" strokeWidth={1.2} />
-      <path d="M52 36 C 62 36, 66 56, 78 56" fill="none" stroke="rgba(139,92,246,0.6)" strokeWidth={1.2} />
-      <path d="M122 18 C 134 18, 136 32, 148 32" fill="none" stroke="rgba(139,92,246,0.6)" strokeWidth={1.2} />
-      <path d="M122 56 C 134 56, 136 40, 148 40" fill="none" stroke="rgba(139,92,246,0.6)" strokeWidth={1.2} />
-      <circle cx={170} cy={36} r={2.5} fill="#A78BFA">
+      <path d="M52 36 C 62 36, 66 18, 78 18" fill="none" stroke="rgba(124,58,237,0.55)" strokeWidth={1.2} />
+      <path d="M52 36 C 62 36, 66 56, 78 56" fill="none" stroke="rgba(124,58,237,0.55)" strokeWidth={1.2} />
+      <path d="M122 18 C 134 18, 136 32, 148 32" fill="none" stroke="rgba(124,58,237,0.55)" strokeWidth={1.2} />
+      <path d="M122 56 C 134 56, 136 40, 148 40" fill="none" stroke="rgba(124,58,237,0.55)" strokeWidth={1.2} />
+      <circle cx={170} cy={36} r={2.5} fill="#7C3AED">
         <animateMotion dur="2.4s" repeatCount="indefinite" path="M52 36 C 62 36, 66 18, 78 18 M122 18 C 134 18, 136 32, 148 32" />
       </circle>
     </svg>
@@ -70,12 +70,12 @@ function DagMini() {
 function RetryMini() {
   return (
     <svg viewBox="0 0 200 72" className="mt-6 w-full" aria-hidden>
-      <rect x={8} y={24} width={184} height={24} rx={8} fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.14)" />
-      <rect x={8} y={24} width={120} height={24} rx={8} fill="rgba(124,58,237,0.25)" />
-      <path d="M150 36 h18 m-6 -6 6 6 -6 6" fill="none" stroke="#A78BFA" strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round">
+      <rect x={8} y={24} width={184} height={24} rx={8} fill="rgba(15,23,42,0.05)" stroke="rgba(15,23,42,0.10)" />
+      <rect x={8} y={24} width={120} height={24} rx={8} fill="rgba(124,58,237,0.22)" />
+      <path d="M150 36 h18 m-6 -6 6 6 -6 6" fill="none" stroke="#7C3AED" strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round">
         <animate attributeName="opacity" values="1;0.3;1" dur="1.8s" repeatCount="indefinite" />
       </path>
-      <text x={16} y={40} fill="rgba(255,255,255,0.55)" fontSize={10} fontFamily="ui-monospace,monospace">attempt 2/3 · retrying</text>
+      <text x={16} y={40} fill="rgba(15,23,42,0.55)" fontSize={10} fontFamily="ui-monospace,monospace">attempt 2/3 · retrying</text>
     </svg>
   );
 }
@@ -86,8 +86,8 @@ function TraceMini() {
     <svg viewBox="0 0 200 72" className="mt-6 w-full" aria-hidden>
       {bars.map((w, i) => (
         <g key={i}>
-          <rect x={8} y={8 + i * 10} width={w} height={6} rx={3} fill={i === 2 ? "rgba(139,92,246,0.7)" : "rgba(255,255,255,0.12)"} />
-          <circle cx={4} cy={11 + i * 10} r={1.6} fill={i === 2 ? "#A78BFA" : "rgba(255,255,255,0.25)"} />
+          <rect x={8} y={8 + i * 10} width={w} height={6} rx={3} fill={i === 2 ? "rgba(124,58,237,0.75)" : "rgba(15,23,42,0.10)"} />
+          <circle cx={4} cy={11 + i * 10} r={1.6} fill={i === 2 ? "#7C3AED" : "rgba(15,23,42,0.22)"} />
         </g>
       ))}
     </svg>
@@ -101,10 +101,10 @@ function VectorMini() {
   return (
     <svg viewBox="0 0 200 72" className="mt-6 w-full" aria-hidden>
       {pts.map(([x, y], i) => (
-        <circle key={i} cx={x} cy={y} r={i === 2 ? 4 : 2.4} fill={i === 2 ? "#A78BFA" : "rgba(255,255,255,0.22)"} />
+        <circle key={i} cx={x} cy={y} r={i === 2 ? 4 : 2.4} fill={i === 2 ? "#7C3AED" : "rgba(15,23,42,0.20)"} />
       ))}
-      <circle cx={95} cy={18} r={10} fill="none" stroke="rgba(139,92,246,0.5)" strokeDasharray="3 3" />
-      <text x={112} y={16} fill="rgba(255,255,255,0.4)" fontSize={9} fontFamily="ui-monospace,monospace">top-k</text>
+      <circle cx={95} cy={18} r={10} fill="none" stroke="rgba(124,58,237,0.5)" strokeDasharray="3 3" />
+      <text x={112} y={16} fill="rgba(15,23,42,0.45)" fontSize={9} fontFamily="ui-monospace,monospace">top-k</text>
     </svg>
   );
 }
@@ -112,12 +112,12 @@ function VectorMini() {
 function ApprovalMini() {
   return (
     <svg viewBox="0 0 200 72" className="mt-6 w-full" aria-hidden>
-      <rect x={8} y={20} width={184} height={32} rx={8} fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.14)" />
-      <circle cx={26} cy={36} r={5} fill="none" stroke="#A78BFA" strokeWidth={1.6} />
-      <path d="M24 36 h4 M26 34 v4" stroke="#A78BFA" strokeWidth={1.6} strokeLinecap="round" />
-      <text x={40} y={40} fill="rgba(255,255,255,0.55)" fontSize={10} fontFamily="ui-monospace,monospace">waiting for human…</text>
-      <rect x={150} y={27} width={34} height={18} rx={5} fill="rgba(124,58,237,0.3)" stroke="rgba(139,92,246,0.6)" />
-      <text x={157} y={40} fill="#C4B5FD" fontSize={9}>批准</text>
+      <rect x={8} y={20} width={184} height={32} rx={8} fill="rgba(15,23,42,0.03)" stroke="rgba(15,23,42,0.12)" />
+      <circle cx={26} cy={36} r={5} fill="none" stroke="#7C3AED" strokeWidth={1.6} />
+      <path d="M24 36 h4 M26 34 v4" stroke="#7C3AED" strokeWidth={1.6} strokeLinecap="round" />
+      <text x={40} y={40} fill="rgba(15,23,42,0.55)" fontSize={10} fontFamily="ui-monospace,monospace">waiting for human…</text>
+      <rect x={150} y={27} width={34} height={18} rx={5} fill="rgba(124,58,237,0.12)" stroke="rgba(124,58,237,0.55)" />
+      <text x={157} y={40} fill="#7C3AED" fontSize={9}>批准</text>
     </svg>
   );
 }
@@ -183,26 +183,26 @@ const CURL_RESP = `{
 
 export default function LandingPage() {
   return (
-    <div className={`${inter.className} bg-[#0A0A0F] text-white antialiased`}>
+    <div className={`${inter.className} bg-white text-slate-900 antialiased`}>
       {/* ---------- nav ---------- */}
-      <header className="fixed inset-x-0 top-0 z-30 border-b border-white/8 bg-[#0A0A0F]/75 backdrop-blur-md">
+      <header className="fixed inset-x-0 top-0 z-30 border-b border-slate-200/70 bg-white/80 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-6xl items-center px-6">
           <span className="flex items-center gap-2">
             <span className="h-2.5 w-2.5 rounded-full bg-[#7C3AED]" />
             <span className="text-[15px] font-semibold tracking-tight">AgentFlow</span>
           </span>
-          <nav className="ml-10 hidden items-center gap-7 text-sm text-white/50 md:flex">
-            <a href="#features" className="transition-colors hover:text-white">特性</a>
-            <a href="#api" className="transition-colors hover:text-white">API</a>
-            <a href="#nodes" className="transition-colors hover:text-white">节点</a>
-            <a href="#arch" className="transition-colors hover:text-white">架构</a>
+          <nav className="ml-10 hidden items-center gap-7 text-sm text-slate-500 md:flex">
+            <a href="#features" className="transition-colors hover:text-slate-900">特性</a>
+            <a href="#api" className="transition-colors hover:text-slate-900">API</a>
+            <a href="#nodes" className="transition-colors hover:text-slate-900">节点</a>
+            <a href="#arch" className="transition-colors hover:text-slate-900">架构</a>
           </nav>
           <div className="ml-auto flex items-center gap-3">
             <a
               href={GITHUB_URL}
               target="_blank"
               rel="noreferrer"
-              className="font-mono text-xs uppercase tracking-[0.14em] text-white/50 transition-colors hover:text-white"
+              className="font-mono text-xs uppercase tracking-[0.14em] text-slate-400 transition-colors hover:text-slate-900"
             >
               GitHub
             </a>
@@ -218,20 +218,25 @@ export default function LandingPage() {
 
       {/* ---------- hero ---------- */}
       <section className="relative overflow-hidden pt-16">
-        <div className="mx-auto grid max-w-6xl gap-12 px-6 pb-20 pt-16 md:pt-24 lg:grid-cols-[1.05fr_1fr] lg:items-center">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-0 h-[560px]"
+          style={{ background: "radial-gradient(720px 320px at 50% -40px, rgba(124,58,237,0.10), transparent 70%)" }}
+        />
+        <div className="relative mx-auto grid max-w-6xl gap-12 px-6 pb-20 pt-16 md:pt-24 lg:grid-cols-[1.05fr_1fr] lg:items-center">
           <div>
             <Reveal>
               <MicroLabel>Open source · Agent workflow orchestration</MicroLabel>
             </Reveal>
             <Reveal delay={0.06}>
-              <h1 className="mt-6 text-5xl font-semibold leading-[1.06] tracking-tight md:text-7xl">
+              <h1 className="mt-6 text-5xl font-semibold leading-[1.06] tracking-tight text-slate-900 md:text-7xl">
                 把 AI Agent
                 <br />
-                变成<span className={`${serif.className} italic text-[#A78BFA]`}>可编排</span>的工作流
+                变成<span className={`${serif.className} italic text-[#7C3AED]`}>可编排</span>的工作流
               </h1>
             </Reveal>
             <Reveal delay={0.12}>
-              <p className="mt-6 max-w-md text-[15px] leading-7 text-white/50 md:text-base">
+              <p className="mt-6 max-w-md text-[15px] leading-7 text-slate-500 md:text-base">
                 拖拽节点编排 LLM、工具调用与 RAG 知识库，durable
                 执行引擎保证每一步可靠运行。从原型到生产，一个平台搞定。
               </p>
@@ -248,22 +253,22 @@ export default function LandingPage() {
                   href={GITHUB_URL}
                   target="_blank"
                   rel="noreferrer"
-                  className="rounded-xl border border-white/12 bg-white/[0.03] px-6 py-3 font-mono text-sm text-white/80 transition-colors hover:bg-white/[0.07] hover:text-white"
+                  className="rounded-xl border border-slate-200 bg-white px-6 py-3 font-mono text-sm text-slate-600 transition-colors hover:border-slate-300 hover:text-slate-900"
                 >
                   $ git clone agentflow
                 </a>
               </div>
             </Reveal>
             <Reveal delay={0.24}>
-              <dl className="mt-12 flex gap-10 border-t border-white/8 pt-6">
+              <dl className="mt-12 flex gap-10 border-t border-slate-200 pt-6">
                 {[
                   ["9", "节点类型"],
                   ["DAG", "拓扑执行"],
                   ["API", "一键发布"],
                 ].map(([v, k]) => (
                   <div key={k}>
-                    <dt className="font-mono text-lg font-semibold text-white">{v}</dt>
-                    <dd className="mt-1 font-mono text-[11px] uppercase tracking-[0.18em] text-white/40">{k}</dd>
+                    <dt className="font-mono text-lg font-semibold text-slate-900">{v}</dt>
+                    <dd className="mt-1 font-mono text-[11px] uppercase tracking-[0.18em] text-slate-400">{k}</dd>
                   </div>
                 ))}
               </dl>
@@ -271,9 +276,9 @@ export default function LandingPage() {
           </div>
 
           <Reveal delay={0.15} className="min-w-0">
-            <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xl shadow-slate-200/60">
               <div className="mb-4 flex items-center justify-between">
-                <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-white/40">
+                <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-slate-400">
                   Live demo
                 </p>
                 <div className="flex gap-1.5">
@@ -289,22 +294,22 @@ export default function LandingPage() {
       </section>
 
       {/* ---------- bento features ---------- */}
-      <section id="features" className="border-t border-white/8">
+      <section id="features" className="border-t border-slate-200/70 bg-slate-50/50">
         <div className="mx-auto max-w-6xl px-6 py-24">
           <SectionHead
             micro="Features"
             title={
               <>
-                为生产级 Agent 应用<span className={`${serif.className} italic text-[#A78BFA]`}>而设计</span>
+                为生产级 Agent 应用<span className={`${serif.className} italic text-[#7C3AED]`}>而设计</span>
               </>
             }
           />
           <div className="mt-12 grid gap-4 md:grid-cols-3">
             {BENTO.map((f, i) => (
               <Reveal key={f.title} delay={(i % 3) * 0.06} className={f.large ? "md:col-span-2" : ""}>
-                <div className="group h-full rounded-2xl border border-white/8 bg-white/[0.02] p-6 transition-colors duration-200 hover:border-white/16 hover:bg-white/[0.04]">
-                  <h3 className="text-[15px] font-semibold text-white">{f.title}</h3>
-                  <p className="mt-2 max-w-md text-sm leading-6 text-white/50">{f.desc}</p>
+                <div className="group h-full rounded-2xl border border-slate-200 bg-white p-6 transition-all duration-200 hover:-translate-y-0.5 hover:border-[#7C3AED]/40 hover:shadow-lg hover:shadow-[#7C3AED]/10">
+                  <h3 className="text-[15px] font-semibold text-slate-900">{f.title}</h3>
+                  <p className="mt-2 max-w-md text-sm leading-6 text-slate-500">{f.desc}</p>
                   {f.art}
                 </div>
               </Reveal>
@@ -314,20 +319,20 @@ export default function LandingPage() {
       </section>
 
       {/* ---------- API ---------- */}
-      <section id="api" className="border-t border-white/8">
+      <section id="api" className="border-t border-slate-200/70">
         <div className="mx-auto grid max-w-6xl gap-12 px-6 py-24 lg:grid-cols-2 lg:items-center">
           <SectionHead
             micro="Publish as API"
             title={
               <>
-                工作流<span className={`${serif.className} italic text-[#A78BFA]`}>即</span> API
+                工作流<span className={`${serif.className} italic text-[#7C3AED]`}>即</span> API
               </>
             }
             desc="发布开关一开，工作流就是 HTTP 接口。API Key 鉴权，同步 / 异步双模式，定时触发开箱即用。"
           />
           <Reveal delay={0.1}>
-            <div className="overflow-hidden rounded-2xl border border-white/10 bg-black/40">
-              <div className="flex items-center justify-between border-b border-white/8 px-5 py-3">
+            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 shadow-sm">
+              <div className="flex items-center justify-between border-b border-slate-200 bg-white px-5 py-3">
                 <div className="flex gap-1.5">
                   {["#FF5F57", "#FEBC2E", "#28C840"].map((c) => (
                     <span key={c} className="h-2.5 w-2.5 rounded-full" style={{ background: c }} />
@@ -335,12 +340,12 @@ export default function LandingPage() {
                 </div>
                 <CopyButton text={CURL} />
               </div>
-              <pre className="overflow-x-auto p-5 font-mono text-[12.5px] leading-6 text-white/75">
+              <pre className="overflow-x-auto p-5 font-mono text-[12.5px] leading-6 text-slate-700">
                 <code>{CURL}</code>
               </pre>
-              <div className="border-t border-white/8 px-5 py-4">
-                <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.22em] text-white/35">Response</p>
-                <pre className="font-mono text-[12.5px] leading-6 text-white/55">
+              <div className="border-t border-slate-200 bg-white px-5 py-4">
+                <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.22em] text-slate-400">Response</p>
+                <pre className="font-mono text-[12.5px] leading-6 text-slate-500">
                   <code>{CURL_RESP}</code>
                 </pre>
               </div>
@@ -350,13 +355,13 @@ export default function LandingPage() {
       </section>
 
       {/* ---------- node marquee ---------- */}
-      <section id="nodes" className="overflow-hidden border-t border-white/8 py-24">
+      <section id="nodes" className="overflow-hidden border-t border-slate-200/70 bg-slate-50/50 py-24">
         <div className="mx-auto max-w-6xl px-6">
           <SectionHead
             micro="Node catalog"
             title={
               <>
-                9 种节点，拼出<span className={`${serif.className} italic text-[#A78BFA]`}>任意</span>流程
+                9 种节点，拼出<span className={`${serif.className} italic text-[#7C3AED]`}>任意</span>流程
               </>
             }
           />
@@ -375,12 +380,12 @@ export default function LandingPage() {
                 return (
                   <div
                     key={`${t}-${i}`}
-                    className="flex w-64 shrink-0 items-start gap-3 rounded-2xl border border-white/8 bg-white/[0.02] p-5"
+                    className="flex w-64 shrink-0 items-start gap-3 rounded-2xl border border-slate-200 bg-white p-5"
                   >
                     <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: meta.color }} />
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold text-white">{meta.label}</p>
-                      <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.16em] text-white/35">
+                      <p className="text-sm font-semibold text-slate-800">{meta.label}</p>
+                      <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.16em] text-slate-400">
                         {meta.category}
                       </p>
                     </div>
@@ -393,18 +398,18 @@ export default function LandingPage() {
       </section>
 
       {/* ---------- architecture ---------- */}
-      <section id="arch" className="border-t border-white/8">
+      <section id="arch" className="border-t border-slate-200/70">
         <div className="mx-auto max-w-6xl px-6 py-24">
           <SectionHead
             micro="Architecture"
             title={
               <>
-                Serverless 架构，<span className={`${serif.className} italic text-[#A78BFA]`}>一键</span>部署
+                Serverless 架构，<span className={`${serif.className} italic text-[#7C3AED]`}>一键</span>部署
               </>
             }
             desc="Next.js 全栈控制台部署在 Vercel，数据层、执行器与模型层解耦，各司其职。"
           />
-          <div className="mt-12 grid gap-px overflow-hidden rounded-2xl border border-white/8 bg-white/8 md:grid-cols-4">
+          <div className="mt-12 grid gap-px overflow-hidden rounded-2xl border border-slate-200 bg-slate-200 md:grid-cols-4">
             {[
               ["01 / Console", "可视化画布", "Next.js 全栈 · React Flow 画布 · SSE 实时进度"],
               ["02 / Engine", "执行引擎", "Inngest durable functions：重试、定时、人工审批暂停"],
@@ -412,10 +417,10 @@ export default function LandingPage() {
               ["04 / Models", "模型层", "OpenAI 兼容协议，多 Provider 按序自动降级"],
             ].map(([no, title, desc], i) => (
               <Reveal key={no} delay={i * 0.06} className="h-full">
-                <div className="flex h-full flex-col bg-[#0A0A0F] p-6">
-                  <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-[#A78BFA]">{no}</p>
-                  <h3 className="mt-3 text-[15px] font-semibold text-white">{title}</h3>
-                  <p className="mt-2 text-[13px] leading-6 text-white/45">{desc}</p>
+                <div className="flex h-full flex-col bg-white p-6">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-[#7C3AED]">{no}</p>
+                  <h3 className="mt-3 text-[15px] font-semibold text-slate-900">{title}</h3>
+                  <p className="mt-2 text-[13px] leading-6 text-slate-500">{desc}</p>
                 </div>
               </Reveal>
             ))}
@@ -424,14 +429,14 @@ export default function LandingPage() {
       </section>
 
       {/* ---------- CTA ---------- */}
-      <section className="border-t border-white/8">
+      <section className="border-t border-slate-200/70 bg-slate-50/50">
         <div className="mx-auto max-w-6xl px-6 py-28 text-center">
           <Reveal>
             <MicroLabel>Get started</MicroLabel>
-            <h2 className="mx-auto mt-5 max-w-2xl text-4xl font-semibold tracking-tight md:text-5xl">
+            <h2 className="mx-auto mt-5 max-w-2xl text-4xl font-semibold tracking-tight text-slate-900 md:text-5xl">
               开始编排你的第一个
               <br />
-              Agent <span className={`${serif.className} italic text-[#A78BFA]`}>工作流</span>
+              Agent <span className={`${serif.className} italic text-[#7C3AED]`}>工作流</span>
             </h2>
             <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
               <Link
@@ -444,7 +449,7 @@ export default function LandingPage() {
                 href={GITHUB_URL}
                 target="_blank"
                 rel="noreferrer"
-                className="rounded-xl border border-white/12 px-7 py-3 text-sm font-medium text-white/80 transition-colors hover:bg-white/5 hover:text-white"
+                className="rounded-xl border border-slate-200 bg-white px-7 py-3 text-sm font-medium text-slate-600 transition-colors hover:border-slate-300 hover:text-slate-900"
               >
                 查看源码
               </a>
@@ -454,13 +459,13 @@ export default function LandingPage() {
       </section>
 
       {/* ---------- footer ---------- */}
-      <footer className="border-t border-white/8">
+      <footer className="border-t border-slate-200/70">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-6 py-8 md:flex-row">
-          <span className="flex items-center gap-2 text-xs text-white/40">
+          <span className="flex items-center gap-2 text-xs text-slate-400">
             <span className="h-2 w-2 rounded-full bg-[#7C3AED]" />
             AgentFlow · 可视化 AI Agent 工作流编排平台
           </span>
-          <span className="font-mono text-[11px] uppercase tracking-[0.18em] text-white/30">
+          <span className="font-mono text-[11px] uppercase tracking-[0.18em] text-slate-300">
             MIT · Next.js · Inngest · Supabase
           </span>
         </div>

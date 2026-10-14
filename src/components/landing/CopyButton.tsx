@@ -23,7 +23,7 @@ export default function CopyButton({ text }: { text: string }) {
   return (
     <button
       onClick={copy}
-      className="rounded-md border border-white/10 px-2.5 py-1 font-mono text-[11px] text-white/50 transition-colors hover:bg-white/5 hover:text-white"
+      className="rounded-md border border-slate-200 bg-white px-2.5 py-1 font-mono text-[11px] text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-800"
     >
       {ok ? "已复制" : "复制"}
     </button>
