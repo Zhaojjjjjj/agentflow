@@ -143,7 +143,8 @@
   }
 }
 .msg-in {
-  animation: msg-in 0.28s cubic-bezier(0.21, 0.9, 0.35, 1) both;
+  /* backwards：动画结束后不残留 transform，否则内部的 fixed 弹窗会相对它定位而不是视口 */
+  animation: msg-in 0.28s cubic-bezier(0.21, 0.9, 0.35, 1) backwards;
 }
 
 /* 流式输出光标 */

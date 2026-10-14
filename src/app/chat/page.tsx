@@ -487,9 +487,9 @@ export default function ChatPage() {
   };
 
   return (
-    <>
+    <div className="flex h-[100dvh] flex-col overflow-hidden bg-white">
       <TopNav />
-      <div className="mx-auto flex h-[calc(100vh-3.5rem)] max-w-6xl">
+      <div className="mx-auto flex min-h-0 w-full max-w-6xl flex-1">
         {/* 对话列表 */}
         <aside className="hidden w-64 shrink-0 flex-col border-r border-slate-200/70 py-4 md:flex">
           <div className="px-4 pb-3">
@@ -534,7 +534,7 @@ export default function ChatPage() {
         </aside>
 
         {/* 主对话区 */}
-        <main className="relative flex min-w-0 flex-1 flex-col">
+        <main className="relative flex min-h-0 min-w-0 flex-1 flex-col">
           <div ref={scrollRef} onScroll={onScroll} className="chat-scroll flex-1 overflow-y-auto px-6 py-8">
             {loading ? (
               <div className="mx-auto max-w-3xl">
@@ -699,6 +699,6 @@ export default function ChatPage() {
           </div>
         </main>
       </div>
-    </>
+    </div>
   );
 }
