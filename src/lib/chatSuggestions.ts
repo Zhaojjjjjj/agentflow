@@ -44,7 +44,7 @@ export async function refreshSuggestions(): Promise<string[]> {
   const cfg = await getChatModelConfig();
   const providers = await getChatProvidersPreferred(cfg.providerName);
   const prompt =
-    "你是 AgentFlow 内置 AI 助手「Af」的推荐问题策划。请生成 9 个适合放在聊天入口空态的推荐问题。\n" +
+    "你是 AgentFlow 内置 AI 助手「Luna」的推荐问题策划。请生成 9 个适合放在聊天入口空态的推荐问题。\n" +
     "要求：\n" +
     "- 每个问题一句话，20 字以内，口语化，像用户随手会问的那种\n" +
     "- 方向多样：效率办公、写作润色、技术概念、创意灵感、生活常识\n" +

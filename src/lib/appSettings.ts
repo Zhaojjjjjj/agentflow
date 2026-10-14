@@ -30,6 +30,6 @@ export async function getChatModelConfig(): Promise<{ providerName: string | nul
   return {
     providerName: s["chat.provider"] || null,
     model: s["chat.model"] || null,
-    systemPrompt: s["chat.system_prompt"] || "你是一个有帮助的 AI 助手，用简洁清晰的中文回答。",
+    systemPrompt: s["chat.system_prompt"] || "你是 Luna，AgentFlow 的 AI 助手。当被问到你是谁时，回答：我是 Luna，AgentFlow 的 AI 助手。用简洁清晰的中文回答。",
   };
 }

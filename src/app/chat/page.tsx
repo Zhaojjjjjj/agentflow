@@ -18,10 +18,7 @@ interface Message {
   content: string;
 }
 
-/** AI 助手 —— Web 端问答入口 */
-const CHAT_NAME = "Af";
-
-const SUGGESTION_POOL = [
+const FALLBACK_POOL = [
   "帮我写一段工作周报",
   "解释一下什么是 RAG",
   "给我 3 个提高工作效率的建议",
@@ -36,15 +33,11 @@ const SUGGESTION_POOL = [
   "什么是 prompt 工程，有哪些技巧",
 ];
 
-/** 内置兜底：数据库题目池为空（或迁移未执行）时用 */
-const FALLBACK_POOL = SUGGESTION_POOL;
-
-function pickSuggestions(pool: string[], n: number): string[] {
+function pickFrom(pool: string[], n: number): string[] {
   const rest = [...pool];
   const out: string[] = [];
   while (out.length < n && rest.length > 0) {
-    const i = Math.floor(Math.random() * rest.length);
-    out.push(rest.splice(i, 1)[0]);
+    out.push(rest.splice(Math.floor(Math.random() * rest.length), 1)[0]);
   }
   return out;
 }
@@ -64,6 +57,47 @@ function parseSSE(chunk: string): { event: string; data: string }[] {
   return out;
 }
 
+function CopyButton({ text }: { text: string }) {
+  const [ok, setOk] = useState(false);
+  return (
+    <button
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(text);
+        } catch {
+          const ta = document.createElement("textarea");
+          ta.value = text;
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand("copy");
+          document.body.removeChild(ta);
+        }
+        setOk(true);
+        setTimeout(() => setOk(false), 1500);
+      }}
+      title="复制"
+      className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-slate-400 opacity-0 transition-all hover:bg-slate-100 hover:text-slate-600 group-hover:opacity-100"
+    >
+      {ok ? (
+        <>
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+            <path d="M3 8.5 6.5 12 13 4.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          已复制
+        </>
+      ) : (
+        <>
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+            <rect x="5.5" y="5.5" width="8" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.4" />
+            <path d="M10.5 5.5v-2a1.5 1.5 0 0 0-1.5-1.5H4A1.5 1.5 0 0 0 2.5 3.5v5A1.5 1.5 0 0 0 4 10h1.5" stroke="currentColor" strokeWidth="1.4" />
+          </svg>
+          复制
+        </>
+      )}
+    </button>
+  );
+}
+
 export default function ChatPage() {
   const me = useMe();
   const displayName = me?.nickname || me?.username || "";
@@ -71,17 +105,45 @@ export default function ChatPage() {
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false); // 历史加载
+  const [loading, setLoading] = useState(false);
   const [streaming, setStreaming] = useState(false);
   const [listLoading, setListLoading] = useState(true);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const [showJump, setShowJump] = useState(false);
+
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const taRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
-  // 每次回到空态（新对话）都重新随机抽 3 个推荐问题
+  const stickRef = useRef(true); // 是否吸附在底部
   const [suggestSeed, setSuggestSeed] = useState(0);
   const [pool, setPool] = useState<string[]>(FALLBACK_POOL);
-  const suggestions = useMemo(() => pickSuggestions(pool, 3), [pool, suggestSeed]);
+  const suggestions = useMemo(() => pickFrom(pool, 3), [pool, suggestSeed]);
 
-  // 题目池每天由 AI 刷新一批，这里取当天的；取不到就用内置兜底
+  const scrollToBottom = useCallback((smooth = false) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: smooth ? "smooth" : "auto" });
+  }, []);
+
+  const onScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const near = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+    stickRef.current = near;
+    setShowJump(!near && messages.length > 0);
+  }, [messages.length]);
+
+  // 流式输出时：只有用户本来就贴着底部才跟随，避免把正在往上翻的人拽下来
+  useEffect(() => {
+    if (stickRef.current) scrollToBottom();
+  }, [messages, scrollToBottom]);
+
+  const autoGrow = useCallback(() => {
+    const ta = taRef.current;
+    if (!ta) return;
+    ta.style.height = "auto";
+    ta.style.height = Math.min(ta.scrollHeight, 180) + "px";
+  }, []);
+
   useEffect(() => {
     fetch("/api/chat/suggestions")
       .then((r) => (r.ok ? r.json() : null))
@@ -90,14 +152,6 @@ export default function ChatPage() {
       })
       .catch(() => {});
   }, []);
-
-  const scrollBottom = useCallback(() => {
-    requestAnimationFrame(() => bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" }));
-  }, []);
-
-  useEffect(() => {
-    scrollBottom();
-  }, [messages, scrollBottom]);
 
   const loadList = useCallback(async () => {
     try {
@@ -119,6 +173,8 @@ export default function ChatPage() {
     setCurrentId(id);
     setLoading(true);
     setMessages([]);
+    stickRef.current = true;
+    setShowJump(false);
     try {
       const j = await fetch(`/api/chat/conversations/${id}`).then((r) => r.json());
       if (j.error) throw new Error(j.error);
@@ -136,6 +192,8 @@ export default function ChatPage() {
     setMessages([]);
     setStreaming(false);
     setSuggestSeed((s) => s + 1);
+    stickRef.current = true;
+    setShowJump(false);
   }, []);
 
   const deleteConversation = useCallback(
@@ -166,6 +224,11 @@ export default function ChatPage() {
       const aiMsg: Message = { id: `tmp-a-${Date.now()}`, role: "assistant", content: "" };
       setMessages((ms) => [...ms, userMsg, aiMsg]);
       setInput("");
+      requestAnimationFrame(() => {
+        if (taRef.current) taRef.current.style.height = "auto";
+      });
+      stickRef.current = true;
+      setShowJump(false);
       setStreaming(true);
 
       let convId = currentId;
@@ -201,22 +264,19 @@ export default function ChatPage() {
                 void loadList();
               }
             } else if (event === "token") {
-              acc += (JSON.parse(data).delta as string);
+              acc += JSON.parse(data).delta as string;
               setMessages((ms) => ms.map((m) => (m.id === aiMsg.id ? { ...m, content: acc } : m)));
             } else if (event === "error") {
               throw new Error((JSON.parse(data).error as string) || "对话失败");
             }
           }
         }
-        // 流结束后刷新列表标题
         void loadList();
       } catch (e) {
         if ((e as Error).name === "AbortError") return;
         const msg = e instanceof Error ? e.message : "对话失败";
         setMessages((ms) =>
-          ms.map((m) =>
-            m.id === aiMsg.id ? { ...m, content: m.content || `出错了：${msg}` } : m
-          )
+          ms.map((m) => (m.id === aiMsg.id ? { ...m, content: m.content || `出错了：${msg}` } : m))
         );
       } finally {
         setStreaming(false);
@@ -241,7 +301,7 @@ export default function ChatPage() {
           <div className="px-4 pb-3">
             <button
               onClick={newChat}
-              className="w-full rounded-xl bg-brand-600 py-2.5 text-sm font-medium text-white transition-colors hover:bg-brand-700"
+              className="w-full rounded-xl bg-brand-600 py-2.5 text-sm font-medium text-white transition-all duration-150 hover:bg-brand-700 active:scale-[0.98]"
             >
               ＋ 新对话
             </button>
@@ -255,8 +315,10 @@ export default function ChatPage() {
               conversations.map((c) => (
                 <div
                   key={c.id}
-                  className={`group flex items-center gap-1 rounded-lg px-3 py-2.5 text-sm transition-colors ${
-                    c.id === currentId ? "bg-brand-50 font-medium text-brand-700" : "text-slate-600 hover:bg-slate-50"
+                  className={`group mb-0.5 flex items-center gap-1 rounded-lg px-3 py-2.5 text-sm transition-colors duration-150 ${
+                    c.id === currentId
+                      ? "bg-brand-50 font-medium text-brand-700"
+                      : "text-slate-600 hover:bg-slate-50"
                   }`}
                 >
                   <button onClick={() => void openConversation(c.id)} className="min-w-0 flex-1 truncate text-left">
@@ -265,7 +327,7 @@ export default function ChatPage() {
                   <button
                     onClick={() => void deleteConversation(c.id)}
                     title="删除"
-                    className="hidden shrink-0 rounded p-1 text-slate-300 hover:text-red-500 group-hover:block"
+                    className="shrink-0 rounded p-1 text-slate-300 opacity-0 transition-all hover:text-red-500 group-hover:opacity-100"
                   >
                     <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
                       <path d="M3 4.5h10M6.5 4V2.8h3V4M4.5 4.5l.7 9h5.6l.7-9" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
@@ -278,29 +340,27 @@ export default function ChatPage() {
         </aside>
 
         {/* 主对话区 */}
-        <main className="flex min-w-0 flex-1 flex-col">
-          <header className="flex items-center gap-2.5 border-b border-slate-200/70 px-6 py-3">
-            <Logo size={24} />
-            <h1 className="text-sm font-semibold text-slate-800">{CHAT_NAME}</h1>
-          </header>
-          <div className="chat-scroll flex-1 overflow-y-auto px-6 py-6">
+        <main className="relative flex min-w-0 flex-1 flex-col">
+          <div ref={scrollRef} onScroll={onScroll} className="chat-scroll flex-1 overflow-y-auto px-6 py-8">
             {loading ? (
-              <Skeleton rows={5} />
+              <div className="mx-auto max-w-3xl">
+                <Skeleton rows={5} />
+              </div>
             ) : messages.length === 0 ? (
               <div className="mx-auto flex h-full max-w-2xl flex-col items-center justify-center text-center">
-                <p className="text-3xl font-semibold tracking-tight text-slate-900">
+                <p className="msg-in text-[28px] font-semibold tracking-tight text-slate-900">
                   Hi{displayName ? `，${displayName}` : ""} 👋
                 </p>
-                <p className="mt-3 text-sm leading-6 text-slate-500">
-                  我是你的 AI 助手，有什么可以帮你的？
+                <p className="msg-in mt-3 text-[15px] leading-6 text-slate-500" style={{ animationDelay: "60ms" }}>
+                  我是 Luna，有什么可以帮你的？
                 </p>
-                <div className="mt-8 grid w-full gap-2.5 sm:grid-cols-3">
+                <div className="msg-in mt-9 grid w-full gap-2.5 sm:grid-cols-3" style={{ animationDelay: "120ms" }}>
                   {suggestions.map((s) => (
                     <button
                       key={s}
                       onClick={() => void send(s)}
                       disabled={streaming}
-                      className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-left text-[13px] text-slate-600 transition-all hover:border-brand-300 hover:shadow-sm disabled:opacity-50"
+                      className="rounded-2xl border border-slate-200/90 bg-white px-4 py-3.5 text-left text-[13px] leading-5 text-slate-600 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-all duration-150 hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-[0_6px_16px_rgba(124,58,237,0.10)] disabled:opacity-50"
                     >
                       {s}
                     </button>
@@ -308,62 +368,88 @@ export default function ChatPage() {
                 </div>
               </div>
             ) : (
-              <div className="mx-auto max-w-3xl space-y-6">
+              <div className="mx-auto max-w-3xl space-y-7 pb-4">
                 {messages.map((m) =>
                   m.role === "user" ? (
-                    <div key={m.id} className="flex justify-end">
-                      <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-brand-600 px-4 py-2.5 text-sm leading-6 text-white">
+                    <div key={m.id} className="msg-in flex justify-end">
+                      <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-lg bg-brand-600 px-4 py-2.5 text-[14px] leading-6 text-white shadow-[0_2px_8px_rgba(124,58,237,0.18)]">
                         {m.content}
                       </div>
                     </div>
                   ) : (
-                    <div key={m.id} className="flex gap-3">
-                      <span className="mt-0.5 shrink-0">
-                        <Logo size={28} />
+                    <div key={m.id} className="msg-in group flex gap-3.5">
+                      <span className="mt-1 shrink-0 transition-transform duration-150">
+                        <Logo size={26} />
                       </span>
-                      <div className="markdown-body min-w-0 max-w-[90%] flex-1 rounded-2xl rounded-tl-md bg-slate-50 px-4 py-3 text-sm leading-7 text-slate-800">
-                        {m.content ? (
-                          <Markdown text={m.content} />
-                        ) : (
-                          <span className="inline-flex gap-1 py-2">
-                            {[0, 1, 2].map((i) => (
-                              <span
-                                key={i}
-                                className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-300"
-                                style={{ animationDelay: `${i * 0.15}s` }}
-                              />
-                            ))}
-                          </span>
+                      <div className="min-w-0 flex-1 pt-0.5">
+                        <div className="markdown-body text-[14px] leading-7 text-slate-800">
+                          {m.content ? (
+                            <Markdown text={m.content} />
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 py-2">
+                              {[0, 1, 2].map((i) => (
+                                <span
+                                  key={i}
+                                  className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-300"
+                                  style={{ animationDelay: `${i * 0.15}s` }}
+                                />
+                              ))}
+                            </span>
+                          )}
+                          {streaming && m.content && (
+                            <span className="stream-cursor ml-0.5 inline-block h-[15px] w-[7px] translate-y-[2px] rounded-[2px] bg-brand-500" />
+                          )}
+                        </div>
+                        {m.content && !streaming && (
+                          <div className="mt-1.5 flex items-center gap-1">
+                            <CopyButton text={m.content} />
+                          </div>
                         )}
                       </div>
                     </div>
                   )
                 )}
-                <div ref={bottomRef} />
               </div>
             )}
           </div>
 
+          {/* 回到底部 */}
+          <button
+            onClick={() => scrollToBottom(true)}
+            className={`absolute bottom-28 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-slate-200 bg-white/95 py-1.5 pl-3 pr-3.5 text-xs text-slate-500 shadow-lg backdrop-blur transition-all duration-200 hover:text-slate-800 ${
+              showJump ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-2 opacity-0"
+            }`}
+          >
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+              <path d="M8 3v10m0 0L4 9m4 4 4-4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            回到底部
+          </button>
+
           {/* 输入区 */}
-          <div className="border-t border-slate-200/70 bg-white px-6 py-4">
+          <div className="border-t border-slate-200/60 bg-white/80 px-6 py-4 backdrop-blur">
             <div className="mx-auto max-w-3xl">
-              <div className="flex items-end gap-2.5 rounded-2xl border border-slate-200 bg-white p-2.5 shadow-sm transition-colors focus-within:border-brand-400">
+              <div className="flex items-end gap-2 rounded-[20px] border border-slate-200 bg-white p-2 pl-4 shadow-[0_2px_12px_rgba(15,23,42,0.06)] transition-all duration-150 focus-within:border-brand-400 focus-within:shadow-[0_2px_16px_rgba(124,58,237,0.12)]">
                 <textarea
+                  ref={taRef}
                   value={input}
-                  onChange={(e) => setInput(e.target.value)}
+                  onChange={(e) => {
+                    setInput(e.target.value);
+                    autoGrow();
+                  }}
                   onKeyDown={onKeyDown}
                   rows={1}
-                  placeholder="输入消息，Enter 发送，Shift+Enter 换行…"
-                  className="max-h-36 flex-1 resize-none bg-transparent px-2 py-1.5 text-sm text-slate-800 outline-none placeholder:text-slate-400"
+                  placeholder="问 Luna 点什么…"
+                  className="chat-scroll max-h-[180px] flex-1 resize-none bg-transparent py-2 text-[14px] leading-6 text-slate-800 outline-none placeholder:text-slate-400"
                 />
                 {streaming ? (
                   <button
                     onClick={() => abortRef.current?.abort()}
-                    title="停止"
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-800 text-white transition-colors hover:bg-slate-900"
+                    title="停止生成"
+                    className="mb-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-800 text-white transition-all duration-150 hover:bg-slate-900 active:scale-95"
                   >
-                    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-                      <rect x="3" y="3" width="10" height="10" rx="2" />
+                    <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+                      <rect x="3.5" y="3.5" width="9" height="9" rx="2" />
                     </svg>
                   </button>
                 ) : (
@@ -371,16 +457,16 @@ export default function ChatPage() {
                     onClick={() => void send()}
                     disabled={!input.trim()}
                     title="发送"
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-600 text-white transition-colors hover:bg-brand-700 disabled:opacity-40"
+                    className="mb-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-600 text-white transition-all duration-150 hover:bg-brand-700 active:scale-95 disabled:bg-slate-200 disabled:text-slate-400"
                   >
                     <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
-                      <path d="M2 8.5 14.5 2 9 14.5 7.2 9.3 2 8.5Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+                      <path d="M8 13V3m0 0L4 7m4-4 4 4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                   </button>
                 )}
               </div>
               <p className="mt-2 text-center text-[11px] text-slate-400">
-                对话由管理员配置的模型驱动 · 内容仅保存在你的账号下
+                Luna 由管理员配置的模型驱动 · 对话仅保存在你的账号下
               </p>
             </div>
           </div>

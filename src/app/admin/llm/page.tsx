@@ -392,7 +392,7 @@ export default function SettingsPage() {
                   <textarea
                     value={chatCfg.system_prompt}
                     onChange={(e) => setChatCfg((c) => ({ ...c, system_prompt: e.target.value }))}
-                    placeholder="你是一个有帮助的 AI 助手，用简洁清晰的中文回答。"
+                    placeholder="你是 Luna，AgentFlow 的 AI 助手，用简洁清晰的中文回答。"
                     rows={3}
                     maxLength={4000}
                     className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-brand-400"
