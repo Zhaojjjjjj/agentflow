@@ -5,7 +5,6 @@ import {
   isLoginConfigured,
   isProduction,
   sessionCookieAttrs,
-  clearCookieAttrs,
 } from "@/lib/auth";
 import { verifyPassword } from "@/lib/password";
 import { ensureSeeded, getUserByUsername } from "@/lib/users";
@@ -70,8 +69,13 @@ export async function POST(req: Request) {
   });
   const { name, ...attrs } = sessionCookieAttrs({ secure: isProduction() });
   res.cookies.set(name, token, attrs);
-  // 验证码一次性使用：登录成功后清除
-  const { name: cn, ...cattrs } = clearCookieAttrs({ secure: isProduction() });
-  res.cookies.set(cn, "", cattrs);
+  // 验证码一次性使用：登录成功后清除验证码 cookie（注意：不要动会话 cookie）
+  res.cookies.set(CAPTCHA_COOKIE, "", {
+    httpOnly: true,
+    secure: isProduction(),
+    sameSite: "lax",
+    path: "/",
+    maxAge: 0,
+  });
   return res;
 }
