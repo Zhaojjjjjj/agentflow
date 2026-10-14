@@ -12,6 +12,7 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.47.0",
     "@upstash/redis": "^1.35.0",
+    "@viz-js/viz": "^3.31.0",
     "@xyflow/react": "^12.3.6",
     "framer-motion": "^14.1.0",
     "inngest": "^3.33.0",

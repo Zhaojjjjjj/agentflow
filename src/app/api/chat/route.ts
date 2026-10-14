@@ -3,15 +3,26 @@ import { authUser, unauthorized } from "@/lib/access";
 import { getSupabase } from "@/lib/supabase";
 import { getChatModelConfig } from "@/lib/appSettings";
 import {
+  chat,
   chatStream,
   getChatProvidersPreferred,
   type ChatMessage,
 } from "@/lib/llm/providers";
+import { chatToolDefs, executeChatSkill } from "@/lib/chatSkills";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
 const HISTORY_LIMIT = 20;
+const MAX_TOOL_ROUNDS = 2;
+
+interface PendingAttachment {
+  id: string;
+  filename: string;
+  mime: string;
+  size: number;
+  previewSvg: string | null;
+}
 
 /** POST /api/chat — send a message, stream the assistant reply (SSE). */
 export async function POST(req: NextRequest) {
@@ -35,7 +46,6 @@ export async function POST(req: NextRequest) {
   const sb = getSupabase();
   let conversationId = typeof body.conversationId === "string" ? body.conversationId : null;
 
-  // 新对话：先建会话
   if (conversationId) {
     const { data } = await sb
       .from("chat_conversations")
@@ -64,14 +74,12 @@ export async function POST(req: NextRequest) {
     conversationId = data.id;
   }
 
-  // 存用户消息
   await sb.from("chat_messages").insert({
     conversation_id: conversationId,
     role: "user",
     content: message,
   });
 
-  // 取历史上下文
   const { data: history } = await sb
     .from("chat_messages")
     .select("role, content")
@@ -80,13 +88,14 @@ export async function POST(req: NextRequest) {
     .limit(HISTORY_LIMIT);
 
   const cfg = await getChatModelConfig();
-  const llmMessages: ChatMessage[] = [
+  const roundMessages: ChatMessage[] = [
     { role: "system", content: cfg.systemPrompt },
     ...((history ?? [])
       .filter((m) => m.role === "user" || m.role === "assistant")
       .map((m) => ({ role: m.role as "user" | "assistant", content: m.content })) as ChatMessage[]),
   ];
   const providers = await getChatProvidersPreferred(cfg.providerName);
+  const tools = chatToolDefs();
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -97,14 +106,105 @@ export async function POST(req: NextRequest) {
         try {
           controller.enqueue(enc.encode(`event: ${event}\ndata: ${data}\n\n`));
         } catch {
-          closed = true; // 客户端已断开（点了停止/关页面），后面的只入库不推送
+          closed = true;
         }
       };
       send("conversation", JSON.stringify({ conversationId }));
+      const pending: PendingAttachment[] = [];
       let full = "";
+
+      // ---- 技能调用阶段（非流式，最多 2 轮） ----
+      try {
+        for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+          let toolRes;
+          try {
+            toolRes = await chat(
+              roundMessages,
+              { model: cfg.model ?? undefined, temperature: 0.7, maxTokens: 2048, tools },
+              providers
+            );
+          } catch (e) {
+            // 供应商不支持 tool-calling 时降级为纯文本对话
+            const msg = e instanceof Error ? e.message : "";
+            if (/tool/i.test(msg)) {
+              toolRes = await chat(
+                roundMessages,
+                { model: cfg.model ?? undefined, temperature: 0.7, maxTokens: 2048 },
+                providers
+              );
+            } else {
+              throw e;
+            }
+          }
+          if (!toolRes.toolCalls.length) break;
+          // 把 assistant 的 tool_calls 记回上下文
+          roundMessages.push({
+            role: "assistant",
+            content: toolRes.text || "",
+            tool_calls: toolRes.toolCalls.map((tc) => ({
+              id: tc.id,
+              type: "function" as const,
+              function: { name: tc.name, arguments: JSON.stringify(tc.arguments) },
+            })),
+          });
+          for (const tc of toolRes.toolCalls.slice(0, 2)) {
+            send("status", JSON.stringify({ text: "Luna 正在准备文件…" }));
+            try {
+              const result = await executeChatSkill(tc.name, tc.arguments);
+              const fileSummaries: string[] = [];
+              for (const f of result.files) {
+                const { data: att, error } = await sb
+                  .from("chat_attachments")
+                  .insert({
+                    conversation_id: conversationId,
+                    filename: f.filename,
+                    mime_type: f.mime,
+                    content_text: f.content,
+                    preview_svg: f.previewSvg ?? null,
+                    size_bytes: Buffer.byteLength(f.content, "utf8"),
+                  })
+                  .select("id")
+                  .single();
+                if (!error && att) {
+                  pending.push({
+                    id: att.id,
+                    filename: f.filename,
+                    mime: f.mime,
+                    size: Buffer.byteLength(f.content, "utf8"),
+                    previewSvg: f.previewSvg ?? null,
+                  });
+                }
+                fileSummaries.push(f.filename);
+              }
+              send("attachments", JSON.stringify({ attachments: pending.slice(-result.files.length) }));
+              roundMessages.push({
+                role: "tool",
+                tool_call_id: tc.id,
+                content: `${result.summary}（文件：${fileSummaries.join("、")}）`,
+              });
+            } catch (e) {
+              roundMessages.push({
+                role: "tool",
+                tool_call_id: tc.id,
+                content: `技能执行失败：${e instanceof Error ? e.message : String(e)}。请用文字向用户说明失败原因，不要重复调用。`,
+              });
+            }
+          }
+        }
+      } catch (e) {
+        send("error", JSON.stringify({ error: e instanceof Error ? e.message : "对话失败" }));
+        try {
+          controller.close();
+        } catch {
+          /* 已断开 */
+        }
+        return;
+      }
+
+      // ---- 最终回答（流式） ----
       try {
         await chatStream(
-          llmMessages,
+          roundMessages,
           { model: cfg.model ?? undefined, temperature: 0.7, maxTokens: 2048 },
           {
             onToken: (delta) => {
@@ -117,13 +217,18 @@ export async function POST(req: NextRequest) {
       } catch (e) {
         send("error", JSON.stringify({ error: e instanceof Error ? e.message : "对话失败" }));
       }
-      // 无论客户端是否断开，有内容就入库（点了"停止"的部分回答也保留）
       if (full) {
-        await sb.from("chat_messages").insert({
-          conversation_id: conversationId,
-          role: "assistant",
-          content: full,
-        });
+        const { data: saved } = await sb
+          .from("chat_messages")
+          .insert({ conversation_id: conversationId, role: "assistant", content: full })
+          .select("id")
+          .single();
+        if (saved && pending.length > 0) {
+          await sb
+            .from("chat_attachments")
+            .update({ message_id: saved.id })
+            .in("id", pending.map((p) => p.id));
+        }
         await sb
           .from("chat_conversations")
           .update({ updated_at: new Date().toISOString() })

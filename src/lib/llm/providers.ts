@@ -14,8 +14,24 @@ export interface LLMProviderConfig {
 }
 
 export interface ChatMessage {
-  role: "system" | "user" | "assistant";
+  role: "system" | "user" | "assistant" | "tool";
   content: string;
+  /** OpenAI tool-calling: assistant 消息携带 tool_calls，tool 消息携带 tool_call_id */
+  tool_calls?: Array<{
+    id: string;
+    type: "function";
+    function: { name: string; arguments: string };
+  }>;
+  tool_call_id?: string;
+}
+
+export interface ToolDef {
+  type: "function";
+  function: {
+    name: string;
+    description: string;
+    parameters: Record<string, unknown>;
+  };
 }
 
 export interface ChatOptions {
@@ -23,6 +39,15 @@ export interface ChatOptions {
   maxTokens?: number;
   /** Override the model for this call (per-node config). */
   model?: string;
+  /** Function-calling tools (Luna chat skills). */
+  tools?: ToolDef[];
+  toolChoice?: "auto" | "none";
+}
+
+export interface ToolCall {
+  id: string;
+  name: string;
+  arguments: Record<string, unknown>;
 }
 
 export interface ChatResult {
@@ -32,6 +57,7 @@ export interface ChatResult {
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;
+  toolCalls: ToolCall[];
 }
 
 function readProvidersFromEnv(): LLMProviderConfig[] {
@@ -115,18 +141,23 @@ async function chatOnce(
   options: ChatOptions
 ): Promise<ChatResult> {
   const model = options.model || provider.model;
+  const body: Record<string, unknown> = {
+    model,
+    messages,
+    temperature: options.temperature ?? 0.7,
+    max_tokens: options.maxTokens ?? 2048,
+  };
+  if (options.tools && options.tools.length > 0) {
+    body.tools = options.tools;
+    body.tool_choice = options.toolChoice ?? "auto";
+  }
   const res = await fetch(`${provider.baseURL}/chat/completions`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${provider.apiKey}`,
     },
-    body: JSON.stringify({
-      model,
-      messages,
-      temperature: options.temperature ?? 0.7,
-      max_tokens: options.maxTokens ?? 2048,
-    }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
@@ -138,6 +169,17 @@ async function chatOnce(
   const usage = data?.usage ?? {};
   const promptTokens = Number(usage.prompt_tokens ?? 0);
   const completionTokens = Number(usage.completion_tokens ?? 0);
+  const toolCalls: ToolCall[] = [];
+  for (const tc of choice.message?.tool_calls ?? []) {
+    if (tc?.type !== "function" || !tc.function?.name) continue;
+    let args: Record<string, unknown> = {};
+    try {
+      args = JSON.parse(tc.function.arguments || "{}");
+    } catch {
+      continue; // 参数不是合法 JSON，跳过这次调用
+    }
+    toolCalls.push({ id: tc.id || `tc-${Date.now()}`, name: tc.function.name, arguments: args });
+  }
   return {
     text: choice.message?.content ?? "",
     provider: provider.name,
@@ -145,6 +187,7 @@ async function chatOnce(
     promptTokens,
     completionTokens,
     totalTokens: promptTokens + completionTokens,
+    toolCalls,
   };
 }
 

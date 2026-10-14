@@ -14,7 +14,7 @@ async function ownConversation(sb: ReturnType<typeof getSupabase>, id: string, u
   return !!data;
 }
 
-/** Get messages of one conversation. */
+/** Get messages of one conversation (with attachments). */
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const me = await authUser(req);
   if (!me) return unauthorized();
@@ -30,7 +30,21 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     .order("created_at", { ascending: true })
     .limit(200);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ messages: data ?? [] });
+  const msgIds = (data ?? []).map((m) => m.id);
+  let attachments: { id: string; message_id: string; filename: string; mime_type: string; size_bytes: number; preview_svg: string | null }[] = [];
+  if (msgIds.length > 0) {
+    const { data: atts } = await sb
+      .from("chat_attachments")
+      .select("id, message_id, filename, mime_type, size_bytes, preview_svg")
+      .in("message_id", msgIds)
+      .order("created_at", { ascending: true });
+    attachments = (atts ?? []) as typeof attachments;
+  }
+  const messages = (data ?? []).map((m) => ({
+    ...m,
+    attachments: attachments.filter((a) => a.message_id === m.id),
+  }));
+  return NextResponse.json({ messages });
 }
 
 /** Delete a conversation (messages cascade). */

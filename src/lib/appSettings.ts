@@ -1,4 +1,5 @@
 import { getSupabase } from "./supabase";
+import { SKILL_SYSTEM_PROMPT } from "./chatSkills";
 
 /** Simple key-value app settings (admin-configured). Keys: chat.provider, chat.model, chat.system_prompt */
 export async function getSetting(key: string): Promise<string | null> {
@@ -24,12 +25,17 @@ export async function setSetting(key: string, value: string): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
+const DEFAULT_SYSTEM_PROMPT =
+  "你是 Luna，AgentFlow 的 AI 助手。当被问到你是谁时，回答：我是 Luna，AgentFlow 的 AI 助手。用简洁清晰的中文回答。";
+
 /** Resolve which provider+model the Chat page should use (admin-configured, falls back to priority order). */
 export async function getChatModelConfig(): Promise<{ providerName: string | null; model: string | null; systemPrompt: string }> {
   const s = await getSettings(["chat.provider", "chat.model", "chat.system_prompt"]);
+  const base = s["chat.system_prompt"] || DEFAULT_SYSTEM_PROMPT;
   return {
     providerName: s["chat.provider"] || null,
     model: s["chat.model"] || null,
-    systemPrompt: s["chat.system_prompt"] || "你是 Luna，AgentFlow 的 AI 助手。当被问到你是谁时，回答：我是 Luna，AgentFlow 的 AI 助手。用简洁清晰的中文回答。",
+    // 技能说明拼在系统提示词后面（管理员自定义的提示词也生效）
+    systemPrompt: `${base}\n\n${SKILL_SYSTEM_PROMPT}`,
   };
 }

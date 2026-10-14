@@ -12,10 +12,18 @@ interface Conversation {
   title: string;
   updated_at: string;
 }
+interface Attachment {
+  id: string;
+  filename: string;
+  mime: string;
+  size: number;
+  previewSvg: string | null;
+}
 interface Message {
   id: string;
   role: "user" | "assistant" | "system";
   content: string;
+  attachments?: Attachment[];
 }
 
 const FALLBACK_POOL = [
@@ -57,8 +65,76 @@ function parseSSE(chunk: string): { event: string; data: string }[] {
   return out;
 }
 
-function CopyButton({ text }: { text: string }) {
-  const [ok, setOk] = useState(false);
+function fileIcon(filename: string) {
+  if (filename.endsWith(".svg"))
+    return (
+      <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+        <rect x="2.5" y="2.5" width="15" height="15" rx="3" stroke="#7c3aed" strokeWidth="1.6" />
+        <circle cx="7.5" cy="8" r="1.6" fill="#7c3aed" />
+        <path d="M4 15l4-4 3 3 2.5-2.5L17 15" stroke="#7c3aed" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  return (
+    <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+      <path d="M5 2.5h6L15.5 7v10.5H5V2.5z" stroke="#7c3aed" strokeWidth="1.6" strokeLinejoin="round" />
+      <path d="M11 2.5V7h4.5" stroke="#7c3aed" strokeWidth="1.6" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function formatSize(n: number) {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / 1024 / 1024).toFixed(1)} MB`;
+}
+
+/** 技能产出的文件卡片：预览 + 下载 */
+function AttachmentCard({ att }: { att: Attachment }) {
+  const [showPreview, setShowPreview] = useState(false);
+  const canPreview = att.mime === "image/svg+xml" && att.previewSvg;
+  return (
+    <div className="mt-3 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.06)]">
+      <div className="flex items-center gap-3 px-4 py-3">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-50">
+          {fileIcon(att.filename)}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[13px] font-medium text-slate-800">{att.filename}</p>
+          <p className="text-[11px] text-slate-400">{formatSize(att.size)}</p>
+        </div>
+        {canPreview && (
+          <button
+            onClick={() => setShowPreview((v) => !v)}
+            className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-brand-600 transition-colors hover:bg-brand-50"
+          >
+            {showPreview ? "收起预览" : "预览"}
+          </button>
+        )}
+        <a
+          href={`/api/chat/attachments/${att.id}`}
+          download
+          className="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-brand-700"
+        >
+          下载
+        </a>
+      </div>
+      {canPreview && showPreview && (
+        <div className="border-t border-slate-100 bg-slate-50/60 p-4">
+          {/* sandboxed iframe：SVG 内容来自模型输入，隔离执行 */}
+          <iframe
+            title={att.filename}
+            sandbox=""
+            srcDoc={att.previewSvg!}
+            className="max-h-[480px] w-full rounded-xl border border-slate-200 bg-white"
+            style={{ minHeight: 240 }}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CopyButton({ text }: { text: string }) {  const [ok, setOk] = useState(false);
   return (
     <button
       onClick={async () => {
@@ -109,6 +185,7 @@ export default function ChatPage() {
   const [streaming, setStreaming] = useState(false);
   const [listLoading, setListLoading] = useState(true);
   const [showJump, setShowJump] = useState(false);
+  const [skillStatus, setSkillStatus] = useState<string | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
@@ -178,7 +255,22 @@ export default function ChatPage() {
     try {
       const j = await fetch(`/api/chat/conversations/${id}`).then((r) => r.json());
       if (j.error) throw new Error(j.error);
-      setMessages(j.messages || []);
+      setMessages(
+        (j.messages || []).map(
+          (m: { id: string; role: Message["role"]; content: string; attachments?: Record<string, unknown>[] }) => ({
+            id: m.id,
+            role: m.role,
+            content: m.content,
+            attachments: (m.attachments || []).map((a) => ({
+              id: String(a.id),
+              filename: String(a.filename),
+              mime: String(a.mime_type ?? a.mime ?? ""),
+              size: Number(a.size_bytes ?? a.size ?? 0),
+              previewSvg: (a.preview_svg ?? a.previewSvg ?? null) as string | null,
+            })),
+          })
+        )
+      );
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "加载对话失败");
     } finally {
@@ -230,6 +322,7 @@ export default function ChatPage() {
       stickRef.current = true;
       setShowJump(false);
       setStreaming(true);
+      setSkillStatus(null);
 
       let convId = currentId;
       try {
@@ -266,6 +359,20 @@ export default function ChatPage() {
             } else if (event === "token") {
               acc += JSON.parse(data).delta as string;
               setMessages((ms) => ms.map((m) => (m.id === aiMsg.id ? { ...m, content: acc } : m)));
+            } else if (event === "status") {
+              setSkillStatus((JSON.parse(data).text as string) || null);
+            } else if (event === "attachments") {
+              const list = (JSON.parse(data).attachments || []) as Attachment[];
+              if (list.length > 0) {
+                setSkillStatus(null);
+                setMessages((ms) =>
+                  ms.map((m) =>
+                    m.id === aiMsg.id
+                      ? { ...m, attachments: [...(m.attachments || []), ...list] }
+                      : m
+                  )
+                );
+              }
             } else if (event === "error") {
               throw new Error((JSON.parse(data).error as string) || "对话失败");
             }
@@ -280,6 +387,7 @@ export default function ChatPage() {
         );
       } finally {
         setStreaming(false);
+        setSkillStatus(null);
       }
     },
     [input, streaming, currentId, loadList]
@@ -385,6 +493,11 @@ export default function ChatPage() {
                         <div className="markdown-body text-[14px] leading-7 text-slate-800">
                           {m.content ? (
                             <Markdown text={m.content} />
+                          ) : skillStatus && streaming ? (
+                            <span className="inline-flex items-center gap-2 py-2 text-[13px] text-slate-500">
+                              <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-brand-200 border-t-brand-600" />
+                              {skillStatus}
+                            </span>
                           ) : (
                             <span className="inline-flex items-center gap-1.5 py-2">
                               {[0, 1, 2].map((i) => (
@@ -400,6 +513,13 @@ export default function ChatPage() {
                             <span className="stream-cursor ml-0.5 inline-block h-[15px] w-[7px] translate-y-[2px] rounded-[2px] bg-brand-500" />
                           )}
                         </div>
+                        {(m.attachments?.length ?? 0) > 0 && (
+                          <div className="max-w-xl space-y-2.5">
+                            {m.attachments!.map((a) => (
+                              <AttachmentCard key={a.id} att={a} />
+                            ))}
+                          </div>
+                        )}
                         {m.content && !streaming && (
                           <div className="mt-1.5 flex items-center gap-1">
                             <CopyButton text={m.content} />
