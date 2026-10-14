@@ -53,3 +53,15 @@ export async function executeChatSkill(name: string, args: Record<string, unknow
   if (!skill) throw new Error(`未知技能: ${name}`);
   return skill.execute(args);
 }
+
+/** 技能中文名（用于思考步骤展示） */
+export const CHAT_SKILL_LABELS: Record<string, string> = {
+  graphviz_diagram: "画图表",
+  drawio_diagram: "画可编辑流程图",
+  json_canvas: "整理脑图",
+  markdown_doc: "写文档",
+  code_file: "写代码",
+  csv_table: "整理表格",
+  json_data: "准备数据",
+  html_page: "做页面",
+};

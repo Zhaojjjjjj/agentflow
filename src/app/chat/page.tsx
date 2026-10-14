@@ -195,7 +195,7 @@ export default function ChatPage() {
   const [streaming, setStreaming] = useState(false);
   const [listLoading, setListLoading] = useState(true);
   const [showJump, setShowJump] = useState(false);
-  const [skillStatus, setSkillStatus] = useState<string | null>(null);
+  const [steps, setSteps] = useState<string[]>([]);
   const [thinkStart, setThinkStart] = useState<number | null>(null);
   const [nowTick, setNowTick] = useState(0);
 
@@ -342,7 +342,7 @@ export default function ChatPage() {
       stickRef.current = true;
       setShowJump(false);
       setStreaming(true);
-      setSkillStatus("Luna 思考中…");
+      setSteps([]);
       setThinkStart(Date.now());
       setNowTick(Date.now());
 
@@ -383,11 +383,13 @@ export default function ChatPage() {
               setThinkStart(null);
               setMessages((ms) => ms.map((m) => (m.id === aiMsg.id ? { ...m, content: acc } : m)));
             } else if (event === "status") {
-              setSkillStatus((JSON.parse(data).text as string) || null);
+              const text = (JSON.parse(data).text as string) || "";
+              if (text) {
+                setSteps((prev) => (prev[prev.length - 1] === text ? prev : [...prev, text].slice(-4)));
+              }
             } else if (event === "attachments") {
               const list = (JSON.parse(data).attachments || []) as Attachment[];
               if (list.length > 0) {
-                setSkillStatus(null);
                 setMessages((ms) =>
                   ms.map((m) =>
                     m.id === aiMsg.id
@@ -410,7 +412,7 @@ export default function ChatPage() {
         );
       } finally {
         setStreaming(false);
-        setSkillStatus(null);
+        setSteps([]);
         setThinkStart(null);
       }
     },
@@ -517,16 +519,32 @@ export default function ChatPage() {
                         <div className="markdown-body text-[14px] leading-7 text-slate-800">
                           {m.content ? (
                             <Markdown text={m.content} />
-                          ) : skillStatus && streaming ? (
-                            <span className="inline-flex items-center gap-2 py-2 text-[13px] text-slate-500">
-                              <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-brand-200 border-t-brand-600" />
-                              {skillStatus}
-                              {thinkStart !== null && (
-                                <span className="tabular-nums text-slate-400">
-                                  {Math.max(1, Math.floor((nowTick - thinkStart) / 1000))}s
-                                </span>
-                              )}
-                            </span>
+                          ) : steps.length > 0 && streaming ? (
+                            <div className="flex flex-col gap-1.5 py-2">
+                              {steps.map((st, i) => {
+                                const isLast = i === steps.length - 1;
+                                return (
+                                  <span
+                                    key={`${i}-${st}`}
+                                    className="msg-in inline-flex items-center gap-2 text-[12.5px] text-slate-400"
+                                  >
+                                    {isLast ? (
+                                      <span className="h-3 w-3 animate-spin rounded-full border-[1.5px] border-slate-200 border-t-brand-500" />
+                                    ) : (
+                                      <svg width="12" height="12" viewBox="0 0 16 16" fill="none" className="text-slate-300">
+                                        <path d="M3 8.5 6.5 12 13 4.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                                      </svg>
+                                    )}
+                                    <span className={isLast ? "text-slate-500" : ""}>{st}…</span>
+                                    {isLast && thinkStart !== null && (
+                                      <span className="tabular-nums text-slate-300">
+                                        {Math.max(1, Math.floor((nowTick - thinkStart) / 1000))}s
+                                      </span>
+                                    )}
+                                  </span>
+                                );
+                              })}
+                            </div>
                           ) : (
                             <span className="inline-flex items-center gap-1.5 py-2">
                               {[0, 1, 2].map((i) => (

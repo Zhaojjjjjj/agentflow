@@ -8,7 +8,7 @@ import {
   getChatProvidersPreferred,
   type ChatMessage,
 } from "@/lib/llm/providers";
-import { chatToolDefs, executeChatSkill } from "@/lib/chatSkills";
+import { chatToolDefs, executeChatSkill, CHAT_SKILL_LABELS } from "@/lib/chatSkills";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -117,7 +117,7 @@ export async function POST(req: NextRequest) {
       let full = "";
 
       try {
-        send("status", JSON.stringify({ text: "Luna 正在思考…" }));
+        send("status", JSON.stringify({ text: "正在理解你的问题" }));
         // ---- 技能调用阶段（非流式，最多 2 轮） ----
         for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
           let toolRes;
@@ -152,7 +152,8 @@ export async function POST(req: NextRequest) {
             })),
           });
           for (const tc of toolRes.toolCalls.slice(0, 2)) {
-            send("status", JSON.stringify({ text: "Luna 正在准备文件…" }));
+            const label = CHAT_SKILL_LABELS[tc.name] || "准备文件";
+            send("status", JSON.stringify({ text: `正在${label}` }));
             try {
               const result = await executeChatSkill(tc.name, tc.arguments);
               const fileSummaries: string[] = [];
@@ -209,6 +210,7 @@ export async function POST(req: NextRequest) {
       }
 
       // ---- 最终回答（流式） ----
+      send("status", JSON.stringify({ text: "正在组织回答" }));
       try {
         await chatStream(
           roundMessages,
