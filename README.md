@@ -1,4 +1,4 @@
-# agentflow · 可视化 AI Agent 工作流编排与执行平台
+# AgentFlow · 可视化 AI Agent 工作流编排与执行平台
 
 拖拽编排 AI Agent 工作流：LLM 调用、HTTP 工具、条件分支、循环、RAG 检索、人工审批，一键运行并可发布为 HTTP API。
 
