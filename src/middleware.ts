@@ -4,7 +4,7 @@ import { SESSION_COOKIE, getSessionClaims } from "@/lib/auth";
 
 // ---- 拦截规则 ----
 // 页面：控制台页面（`/` 为公开落地页，不拦截）
-const PAGE_PREFIXES = ["/workflows", "/runs", "/api-keys", "/settings", "/admin", "/account"];
+const PAGE_PREFIXES = ["/workflows", "/runs", "/api-keys", "/settings", "/admin", "/account", "/chat"];
 // 内部 API：控制台调用的全部数据接口
 const API_PREFIXES = [
   "/api/workflows",
@@ -16,6 +16,7 @@ const API_PREFIXES = [
   "/api/auth/me",
   "/api/auth/change-password",
   "/api/account",
+  "/api/chat",
 ];
 // ---- 管理员专属 ----
 // LLM 供应商配置归 admin 所有、普通用户共用；数据统计与用户管理归 admin
@@ -68,6 +69,7 @@ export const config = {
     "/settings/:path*",
     "/admin/:path*",
     "/account/:path*",
+    "/chat/:path*",
     "/api/workflows/:path*",
     "/api/runs/:path*",
     "/api/documents/:path*",
@@ -77,5 +79,6 @@ export const config = {
     "/api/auth/me",
     "/api/auth/change-password",
     "/api/account/:path*",
+    "/api/chat/:path*",
   ],
 };

@@ -8,6 +8,7 @@ import Modal from "@/components/Modal";
 interface UserRow {
   id: string;
   username: string;
+  nickname: string | null;
   avatar_url: string | null;
   role: string;
   created_at: string;
@@ -243,6 +244,9 @@ export default function AdminUsersPage() {
                           </span>
                         )}
                         <span className="font-medium text-slate-800">{u.username}</span>
+                        {u.nickname && (
+                          <span className="text-xs text-slate-400">（{u.nickname}）</span>
+                        )}
                       </span>
                     </td>
                     <td className="py-2.5 pr-4">

@@ -65,6 +65,39 @@ export default function SettingsPage() {
   const [deleteTarget, setDeleteTarget] = useState<Provider | null>(null);
   const [importOpen, setImportOpen] = useState(false);
 
+  // ---- Chat 对话模型配置 ----
+  const [chatCfg, setChatCfg] = useState({ provider: "", model: "", system_prompt: "" });
+  const [chatCfgLoaded, setChatCfgLoaded] = useState(false);
+  const [chatSaving, setChatSaving] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/admin/settings")
+      .then((r) => r.json())
+      .then((j) => {
+        if (!j.error) setChatCfg({ provider: j.provider || "", model: j.model || "", system_prompt: j.system_prompt || "" });
+      })
+      .catch(() => {})
+      .finally(() => setChatCfgLoaded(true));
+  }, []);
+
+  const saveChatCfg = async () => {
+    setChatSaving(true);
+    try {
+      const res = await fetch("/api/admin/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(chatCfg),
+      });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error || "保存失败");
+      toast.success("对话模型配置已保存");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "保存失败");
+    } finally {
+      setChatSaving(false);
+    }
+  };
+
   const load = async () => {
     setLoading(true);
     try {
@@ -325,6 +358,52 @@ export default function SettingsPage() {
           </div>
         ) : (
           <>
+            {/* Chat 对话模型 */}
+            <section className="card mb-6 p-6">
+              <h3 className="text-sm font-semibold text-slate-800">Chat 对话模型</h3>
+              <p className="mt-1 text-xs leading-5 text-slate-400">
+                顶部导航「Chat」问答使用的模型，与工作流节点模型相互独立。不选则按上面的对话供应商优先级自动选择。
+              </p>
+              <div className="mt-4 grid max-w-xl gap-4">
+                <Field label="供应商">
+                  <Select
+                    value={chatCfg.provider}
+                    onChange={(e) => setChatCfg((c) => ({ ...c, provider: e.target.value }))}
+                  >
+                    <option value="">按优先级自动选择</option>
+                    {providers
+                      .filter((p) => p.kind === "chat" && p.enabled)
+                      .map((p) => (
+                        <option key={p.id} value={p.name}>
+                          {p.name}（{p.model}）
+                        </option>
+                      ))}
+                  </Select>
+                </Field>
+                <Field label="模型（留空则用供应商默认模型）">
+                  <Input
+                    value={chatCfg.model}
+                    onChange={(e) => setChatCfg((c) => ({ ...c, model: e.target.value }))}
+                    placeholder="例如 gpt-4o-mini"
+                  />
+                </Field>
+                <Field label="系统提示词">
+                  <textarea
+                    value={chatCfg.system_prompt}
+                    onChange={(e) => setChatCfg((c) => ({ ...c, system_prompt: e.target.value }))}
+                    placeholder="你是一个有帮助的 AI 助手，用简洁清晰的中文回答。"
+                    rows={3}
+                    maxLength={4000}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-brand-400"
+                  />
+                </Field>
+                <div>
+                  <Button variant="primary" disabled={chatSaving || !chatCfgLoaded} onClick={saveChatCfg}>
+                    {chatSaving ? "保存中…" : "保存对话配置"}
+                  </Button>
+                </div>
+              </div>
+            </section>
             {renderGroup("chat", "对话供应商", "按优先级从上到下依次试错，全部失败才报错")}
             {renderGroup("embedding", "向量供应商（RAG）", "把知识库文档切块转成向量存入 pgvector，供 rag-retrieve 节点做相似检索；仅优先级最高的启用项生效")}
           </>

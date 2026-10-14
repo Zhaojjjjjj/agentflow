@@ -6,6 +6,7 @@ import Link from "next/link";
 export interface MeUser {
   id: string;
   username: string;
+  nickname: string | null;
   role: "admin" | "user";
   avatar_url: string | null;
 }

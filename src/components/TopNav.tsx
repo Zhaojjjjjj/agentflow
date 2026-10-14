@@ -13,6 +13,7 @@ export default function TopNav() {
 
   const NAV = [
     { href: "/", label: "工作流" },
+    { href: "/chat", label: "Chat" },
     { href: "/api-keys", label: "API Keys" },
     ...(me?.role === "admin" ? [{ href: "/admin", label: "管理后台" }] : []),
   ];

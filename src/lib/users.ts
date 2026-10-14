@@ -10,6 +10,7 @@ export interface DbUser {
   username: string;
   password_hash: string;
   avatar_url: string | null;
+  nickname: string | null;
   role: UserRole;
   created_at: string;
 }
@@ -59,7 +60,7 @@ export async function listUsers(): Promise<PublicUser[]> {
   const sb = getSupabase();
   const { data, error } = await sb
     .from("users")
-    .select("id, username, avatar_url, role, created_at")
+    .select("id, username, avatar_url, nickname, role, created_at")
     .order("created_at", { ascending: true });
   if (error) throw new Error(error.message);
   return (data ?? []) as PublicUser[];
@@ -80,7 +81,7 @@ export async function createUser(input: {
   const { data, error } = await sb
     .from("users")
     .insert({ username, password_hash: await hashPassword(input.password), role })
-    .select("id, username, avatar_url, role, created_at")
+    .select("id, username, avatar_url, nickname, role, created_at")
     .single();
   if (error) {
     if (error.message.includes("duplicate") || (error as { code?: string }).code === "23505") {
@@ -104,6 +105,12 @@ export async function setUserPassword(id: string, password: string): Promise<voi
 export async function setUserAvatar(id: string, avatarUrl: string | null): Promise<void> {
   const sb = getSupabase();
   const { error } = await sb.from("users").update({ avatar_url: avatarUrl }).eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+export async function setUserNickname(id: string, nickname: string | null): Promise<void> {
+  const sb = getSupabase();
+  const { error } = await sb.from("users").update({ nickname }).eq("id", id);
   if (error) throw new Error(error.message);
 }
 

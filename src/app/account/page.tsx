@@ -116,9 +116,13 @@ function PasswordForm() {
 export default function AccountPage() {
   const me = useMe();
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [nickname, setNickname] = useState("");
 
   useEffect(() => {
-    if (me) setAvatarUrl(me.avatar_url);
+    if (me) {
+      setAvatarUrl(me.avatar_url);
+      setNickname(me.nickname ?? "");
+    }
   }, [me]);
 
   if (me === undefined) {
@@ -148,7 +152,7 @@ export default function AccountPage() {
         </svg>
         返回控制台
       </Link>
-      <PageHeader title="个人设置" desc="管理你的头像与登录密码" />
+      <PageHeader title="个人设置" desc="管理你的头像、昵称与登录密码" />
       <section className="card mb-6 p-6">
         <h3 className="mb-4 text-sm font-semibold text-slate-800">头像</h3>
         <AvatarBlock user={user} onChanged={setAvatarUrl} />
@@ -158,6 +162,35 @@ export default function AccountPage() {
         <div className="grid max-w-sm gap-4">
           <Field label="用户名">
             <Input value={user.username} disabled />
+          </Field>
+          <Field label="昵称（Chat 里会叫你这个名字）">
+            <div className="flex gap-2">
+              <Input
+                value={nickname}
+                onChange={(e) => setNickname(e.target.value)}
+                placeholder="给自己起个名字"
+                maxLength={24}
+              />
+              <Button
+                variant="secondary"
+                onClick={async () => {
+                  try {
+                    const res = await fetch("/api/account/profile", {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ nickname }),
+                    });
+                    const j = await res.json();
+                    if (!res.ok) throw new Error(j.error || "保存失败");
+                    toast.success("昵称已更新");
+                  } catch (e) {
+                    toast.error(e instanceof Error ? e.message : "保存失败");
+                  }
+                }}
+              >
+                保存
+              </Button>
+            </div>
           </Field>
           <Field label="角色">
             <Input value={user.role === "admin" ? "管理员" : "普通用户"} disabled />

@@ -11,6 +11,12 @@ export async function GET(req: NextRequest) {
   const user = await getUserById(me.id).catch(() => null);
   if (!user) return unauthorized();
   return NextResponse.json({
-    user: { id: user.id, username: user.username, role: user.role, avatar_url: user.avatar_url },
+    user: {
+      id: user.id,
+      username: user.username,
+      nickname: user.nickname,
+      role: user.role,
+      avatar_url: user.avatar_url,
+    },
   });
 }
