@@ -89,10 +89,33 @@ function formatSize(n: number) {
   return `${(n / 1024 / 1024).toFixed(1)} MB`;
 }
 
-/** 技能产出的文件卡片：预览 + 下载 */
+/** 技能产出的文件卡片：预览 + 下载 + 全屏 */
 function AttachmentCard({ att }: { att: Attachment }) {
   const [showPreview, setShowPreview] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
   const previewKind = att.previewHtml ? "html" : att.previewSvg ? "svg" : null;
+
+  // Esc 关闭全屏
+  useEffect(() => {
+    if (!fullscreen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setFullscreen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = "";
+    };
+  }, [fullscreen]);
+
+  const iframe = (cls: string) =>
+    previewKind === "html" ? (
+      <iframe title={att.filename} sandbox="allow-scripts" srcDoc={att.previewHtml!} className={cls} />
+    ) : (
+      <iframe title={att.filename} sandbox="" srcDoc={att.previewSvg!} className={cls} />
+    );
+
   return (
     <div className="mt-3 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.06)]">
       <div className="flex items-center gap-3 px-4 py-3">
@@ -105,10 +128,10 @@ function AttachmentCard({ att }: { att: Attachment }) {
         </div>
         {previewKind && (
           <button
-            onClick={() => setShowPreview((v) => !v)}
+            onClick={() => setFullscreen(true)}
             className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-brand-600 transition-colors hover:bg-brand-50"
           >
-            {showPreview ? "收起预览" : "预览"}
+            全屏预览
           </button>
         )}
         <a
@@ -121,23 +144,60 @@ function AttachmentCard({ att }: { att: Attachment }) {
       </div>
       {previewKind && showPreview && (
         <div className="border-t border-slate-100 bg-slate-50/60 p-4">
-          {previewKind === "html" ? (
-            /* allow-scripts：页面可交互；无 allow-same-origin，拿不到父页面和本地存储 */
-            <iframe
-              title={att.filename}
-              sandbox="allow-scripts"
-              srcDoc={att.previewHtml!}
-              className="h-[480px] w-full rounded-xl border border-slate-200 bg-white"
-            />
-          ) : (
-            <iframe
-              title={att.filename}
-              sandbox=""
-              srcDoc={att.previewSvg!}
-              className="max-h-[480px] w-full rounded-xl border border-slate-200 bg-white"
-              style={{ minHeight: 240 }}
-            />
+          {iframe(
+            previewKind === "html"
+              ? "h-[420px] w-full rounded-xl border border-slate-200 bg-white"
+              : "max-h-[420px] w-full rounded-xl border border-slate-200 bg-white"
           )}
+        </div>
+      )}
+      {previewKind && (
+        <div className="border-t border-slate-100 px-4 py-2">
+          <button
+            onClick={() => setShowPreview((v) => !v)}
+            className="text-xs text-slate-400 transition-colors hover:text-slate-600"
+          >
+            {showPreview ? "收起内联预览 ▲" : "展开内联预览 ▼"}
+          </button>
+        </div>
+      )}
+
+      {/* 全屏预览 */}
+      {fullscreen && previewKind && (
+        <div
+          className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/70 p-3 backdrop-blur-sm md:p-8"
+          onClick={() => setFullscreen(false)}
+        >
+          <div
+            className="flex h-full max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 border-b border-slate-200 px-5 py-3">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-50">
+                {fileIcon(att.filename)}
+              </span>
+              <p className="min-w-0 flex-1 truncate text-sm font-medium text-slate-800">{att.filename}</p>
+              <a
+                href={`/api/chat/attachments/${att.id}`}
+                download
+                className="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-brand-700"
+              >
+                下载
+              </a>
+              <button
+                onClick={() => setFullscreen(false)}
+                title="关闭（Esc）"
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+              >
+                <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                  <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+                </svg>
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 bg-slate-50 p-3 md:p-5">
+              {iframe("h-full w-full rounded-xl border border-slate-200 bg-white")}
+            </div>
+          </div>
         </div>
       )}
     </div>

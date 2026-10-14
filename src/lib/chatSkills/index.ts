@@ -46,6 +46,7 @@ export const SKILL_SYSTEM_PROMPT = `你可以使用以下技能（需要时主�
 
 规则：
 - 当用户说"画个流程图""整理成文档""导出表格""做个页面看看"或明显需要文件/可视化时，直接调用相应技能生成文件，再用一句话介绍文件内容和怎么用。
+- 文件生成后，用 2~3 句话介绍它：这是什么文件、点哪里预览/下载、一个使用小贴士。不要只回一句"做好了"。
 - 一次回答最多调用 2 个技能；不要为了调用而调用，纯文字能讲清楚就别用技能。`;
 
 export async function executeChatSkill(name: string, args: Record<string, unknown>) {
