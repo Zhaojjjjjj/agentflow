@@ -134,4 +134,15 @@ export const scheduleTickFn = inngest.createFunction(
   }
 );
 
-export const functions = [executeWorkflowFn, scheduleTickFn];
+/** 每天凌晨 3 点（北京时间）用 AI 生成一批新的聊天推荐问题，替换题目池 */
+export const refreshSuggestionsFn = inngest.createFunction(
+  { id: "refresh-chat-suggestions", retries: 2 },
+  { cron: "0 19 * * *" }, // 19:00 UTC = 凌晨 3:00 北京时间
+  async () => {
+    const { refreshSuggestions } = await import("../src/lib/chatSuggestions");
+    const items = await refreshSuggestions();
+    return { count: items.length };
+  }
+);
+
+export const functions = [executeWorkflowFn, scheduleTickFn, refreshSuggestionsFn];

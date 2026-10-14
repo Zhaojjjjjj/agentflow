@@ -69,6 +69,7 @@ export default function SettingsPage() {
   const [chatCfg, setChatCfg] = useState({ provider: "", model: "", system_prompt: "" });
   const [chatCfgLoaded, setChatCfgLoaded] = useState(false);
   const [chatSaving, setChatSaving] = useState(false);
+  const [suggRefreshing, setSuggRefreshing] = useState(false);
 
   useEffect(() => {
     fetch("/api/admin/settings")
@@ -397,11 +398,33 @@ export default function SettingsPage() {
                     className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-brand-400"
                   />
                 </Field>
-                <div>
+                <div className="flex flex-wrap items-center gap-2.5">
                   <Button variant="primary" disabled={chatSaving || !chatCfgLoaded} onClick={saveChatCfg}>
                     {chatSaving ? "保存中…" : "保存对话配置"}
                   </Button>
+                  <Button
+                    variant="secondary"
+                    disabled={suggRefreshing}
+                    onClick={async () => {
+                      setSuggRefreshing(true);
+                      try {
+                        const res = await fetch("/api/admin/chat-suggestions/refresh", { method: "POST" });
+                        const j = await res.json();
+                        if (!res.ok) throw new Error(j.error || "生成失败");
+                        toast.success(`题目池已刷新（${j.count} 条）`);
+                      } catch (e) {
+                        toast.error(e instanceof Error ? e.message : "生成失败");
+                      } finally {
+                        setSuggRefreshing(false);
+                      }
+                    }}
+                  >
+                    {suggRefreshing ? "AI 生成中…" : "立即刷新题目池"}
+                  </Button>
                 </div>
+                <p className="text-xs leading-5 text-slate-400">
+                  题目池每天凌晨 3 点由 AI 自动换一批（会参考近 7 天大家的提问话题），也可手动立即刷新。
+                </p>
               </div>
             </section>
             {renderGroup("chat", "对话供应商", "按优先级从上到下依次试错，全部失败才报错")}

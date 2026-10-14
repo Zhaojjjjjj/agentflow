@@ -19,7 +19,7 @@ interface Message {
 }
 
 /** AI 助手 —— Web 端问答入口 */
-const CHAT_NAME = "AI 助手";
+const CHAT_NAME = "Af";
 
 const SUGGESTION_POOL = [
   "帮我写一段工作周报",
@@ -36,12 +36,15 @@ const SUGGESTION_POOL = [
   "什么是 prompt 工程，有哪些技巧",
 ];
 
-function pickSuggestions(n: number): string[] {
-  const pool = [...SUGGESTION_POOL];
+/** 内置兜底：数据库题目池为空（或迁移未执行）时用 */
+const FALLBACK_POOL = SUGGESTION_POOL;
+
+function pickSuggestions(pool: string[], n: number): string[] {
+  const rest = [...pool];
   const out: string[] = [];
-  while (out.length < n && pool.length > 0) {
-    const i = Math.floor(Math.random() * pool.length);
-    out.push(pool.splice(i, 1)[0]);
+  while (out.length < n && rest.length > 0) {
+    const i = Math.floor(Math.random() * rest.length);
+    out.push(rest.splice(i, 1)[0]);
   }
   return out;
 }
@@ -75,7 +78,18 @@ export default function ChatPage() {
   const abortRef = useRef<AbortController | null>(null);
   // 每次回到空态（新对话）都重新随机抽 3 个推荐问题
   const [suggestSeed, setSuggestSeed] = useState(0);
-  const suggestions = useMemo(() => pickSuggestions(3), [suggestSeed]);
+  const [pool, setPool] = useState<string[]>(FALLBACK_POOL);
+  const suggestions = useMemo(() => pickSuggestions(pool, 3), [pool, suggestSeed]);
+
+  // 题目池每天由 AI 刷新一批，这里取当天的；取不到就用内置兜底
+  useEffect(() => {
+    fetch("/api/chat/suggestions")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (j?.suggestions?.length > 0) setPool(j.suggestions);
+      })
+      .catch(() => {});
+  }, []);
 
   const scrollBottom = useCallback(() => {
     requestAnimationFrame(() => bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" }));

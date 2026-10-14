@@ -152,8 +152,12 @@ async function chatOnce(
  * Chat completion across configured providers in order.
  * Throws only when every provider fails (errors are chained in the message).
  */
-export async function chat(messages: ChatMessage[], options: ChatOptions = {}): Promise<ChatResult> {
-  const providers = await getChatProviders();
+export async function chat(
+  messages: ChatMessage[],
+  options: ChatOptions = {},
+  providersOverride?: LLMProviderConfig[]
+): Promise<ChatResult> {
+  const providers = providersOverride ?? (await getChatProviders());
   if (providers.length === 0) {
     throw new Error(
       "No LLM provider configured. Add one in 设置 / LLM 供应商, or set LLM_PROVIDER_1_BASE_URL / LLM_PROVIDER_1_API_KEY / LLM_PROVIDER_1_MODEL."

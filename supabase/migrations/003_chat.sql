@@ -29,3 +29,12 @@ create table if not exists chat_messages (
   created_at timestamptz not null default now()
 );
 create index if not exists idx_chat_msg_conv on chat_messages(conversation_id, created_at);
+
+-- 每日 AI 生成的推荐问题池（每天一批）
+create table if not exists chat_suggestions (
+  id uuid primary key default gen_random_uuid(),
+  text text not null,
+  day date not null default CURRENT_DATE,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_chat_sugg_day on chat_suggestions(day);
