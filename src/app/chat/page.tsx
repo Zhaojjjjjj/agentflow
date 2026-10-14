@@ -196,6 +196,15 @@ export default function ChatPage() {
   const [listLoading, setListLoading] = useState(true);
   const [showJump, setShowJump] = useState(false);
   const [skillStatus, setSkillStatus] = useState<string | null>(null);
+  const [thinkStart, setThinkStart] = useState<number | null>(null);
+  const [nowTick, setNowTick] = useState(0);
+
+  // 思考计时：流式进行中每秒刷新一次
+  useEffect(() => {
+    if (!streaming) return;
+    const t = setInterval(() => setNowTick(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [streaming]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
@@ -333,7 +342,9 @@ export default function ChatPage() {
       stickRef.current = true;
       setShowJump(false);
       setStreaming(true);
-      setSkillStatus(null);
+      setSkillStatus("Luna 思考中…");
+      setThinkStart(Date.now());
+      setNowTick(Date.now());
 
       let convId = currentId;
       try {
@@ -369,6 +380,7 @@ export default function ChatPage() {
               }
             } else if (event === "token") {
               acc += JSON.parse(data).delta as string;
+              setThinkStart(null);
               setMessages((ms) => ms.map((m) => (m.id === aiMsg.id ? { ...m, content: acc } : m)));
             } else if (event === "status") {
               setSkillStatus((JSON.parse(data).text as string) || null);
@@ -399,6 +411,7 @@ export default function ChatPage() {
       } finally {
         setStreaming(false);
         setSkillStatus(null);
+        setThinkStart(null);
       }
     },
     [input, streaming, currentId, loadList]
@@ -508,6 +521,11 @@ export default function ChatPage() {
                             <span className="inline-flex items-center gap-2 py-2 text-[13px] text-slate-500">
                               <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-brand-200 border-t-brand-600" />
                               {skillStatus}
+                              {thinkStart !== null && (
+                                <span className="tabular-nums text-slate-400">
+                                  {Math.max(1, Math.floor((nowTick - thinkStart) / 1000))}s
+                                </span>
+                              )}
                             </span>
                           ) : (
                             <span className="inline-flex items-center gap-1.5 py-2">

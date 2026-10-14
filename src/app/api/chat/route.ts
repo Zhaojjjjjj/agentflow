@@ -111,17 +111,20 @@ export async function POST(req: NextRequest) {
         }
       };
       send("conversation", JSON.stringify({ conversationId }));
+      // 心跳保活：长耗时阶段每 15s 发一个 ping，防止代理掐掉空闲连接
+      const keepalive = setInterval(() => send("ping", JSON.stringify({ t: Date.now() })), 15000);
       const pending: PendingAttachment[] = [];
       let full = "";
 
-      // ---- 技能调用阶段（非流式，最多 2 轮） ----
       try {
+        send("status", JSON.stringify({ text: "Luna 正在思考…" }));
+        // ---- 技能调用阶段（非流式，最多 2 轮） ----
         for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
           let toolRes;
           try {
             toolRes = await chat(
               roundMessages,
-              { model: cfg.model ?? undefined, temperature: 0.7, maxTokens: 2048, tools },
+              { model: cfg.model ?? undefined, temperature: 0.7, maxTokens: 8192, tools },
               providers
             );
           } catch (e) {
@@ -130,7 +133,7 @@ export async function POST(req: NextRequest) {
             if (/tool/i.test(msg)) {
               toolRes = await chat(
                 roundMessages,
-                { model: cfg.model ?? undefined, temperature: 0.7, maxTokens: 2048 },
+                { model: cfg.model ?? undefined, temperature: 0.7, maxTokens: 8192 },
                 providers
               );
             } else {
@@ -195,6 +198,7 @@ export async function POST(req: NextRequest) {
           }
         }
       } catch (e) {
+        clearInterval(keepalive);
         send("error", JSON.stringify({ error: e instanceof Error ? e.message : "对话失败" }));
         try {
           controller.close();
@@ -219,6 +223,8 @@ export async function POST(req: NextRequest) {
         );
       } catch (e) {
         send("error", JSON.stringify({ error: e instanceof Error ? e.message : "对话失败" }));
+      } finally {
+        clearInterval(keepalive);
       }
       if (full) {
         const { data: saved } = await sb
