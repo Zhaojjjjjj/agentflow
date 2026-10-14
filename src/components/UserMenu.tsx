@@ -104,7 +104,7 @@ export default function UserMenu({ user }: { user: MeUser }) {
               onClick={() => setOpen(false)}
               className="block px-4 py-2 text-sm text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900"
             >
-              数据统计
+              管理后台
             </Link>
           )}
           <div className="my-1.5 border-t border-slate-100" />

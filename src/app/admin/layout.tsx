@@ -25,6 +25,15 @@ const MENUS = [
     ),
   },
   {
+    href: "/admin/llm",
+    label: "LLM 配置",
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <path d="M8 1.5 9.8 5.6 14.2 6.3 11 9.5 11.8 13.9 8 11.7 4.2 13.9 5 9.5 1.8 6.3 6.2 5.6Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  {
     href: "/admin/workflows",
     label: "工作流管理",
     icon: (

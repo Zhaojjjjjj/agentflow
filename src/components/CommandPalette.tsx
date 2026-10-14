@@ -105,7 +105,7 @@ export default function CommandPalette() {
     const navs = [
       { label: "工作流列表", href: "/" },
       { label: "API Keys", href: "/api-keys" },
-      { label: "LLM 设置", href: "/settings" },
+      { label: "LLM 配置", href: "/admin/llm" },
     ];
     for (const n of navs) {
       if (match(n.label)) list.push({ id: `nav-${n.href}`, label: `前往${n.label}`, sub: "导航", kind: "nav", run: () => go(n.href) });

@@ -99,7 +99,7 @@ export default function KnowledgeBase({
               供应商（维度须为 1024）。
             </p>
             <a
-              href="/settings"
+              href="/admin/llm"
               className="shrink-0 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-amber-700"
             >
               去设置

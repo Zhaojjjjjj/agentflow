@@ -14,12 +14,7 @@ export default function TopNav() {
   const NAV = [
     { href: "/", label: "工作流" },
     { href: "/api-keys", label: "API Keys" },
-    ...(me?.role === "admin"
-      ? [
-          { href: "/admin", label: "数据统计" },
-          { href: "/settings", label: "LLM 设置" },
-        ]
-      : []),
+    ...(me?.role === "admin" ? [{ href: "/admin", label: "管理后台" }] : []),
   ];
 
   return (
