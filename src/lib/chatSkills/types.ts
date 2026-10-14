@@ -4,8 +4,10 @@ export interface SkillFile {
   filename: string;
   mime: string;
   content: string;
-  /** short inline preview (safe SVG string) when available */
+  /** SVG 内联预览（图表类） */
   previewSvg?: string;
+  /** HTML 交互预览（html_page） */
+  previewHtml?: string;
 }
 
 export interface SkillResult {

@@ -18,6 +18,7 @@ interface Attachment {
   mime: string;
   size: number;
   previewSvg: string | null;
+  previewHtml?: string | null;
 }
 interface Message {
   id: string;
@@ -91,7 +92,7 @@ function formatSize(n: number) {
 /** 技能产出的文件卡片：预览 + 下载 */
 function AttachmentCard({ att }: { att: Attachment }) {
   const [showPreview, setShowPreview] = useState(false);
-  const canPreview = att.mime === "image/svg+xml" && att.previewSvg;
+  const previewKind = att.previewHtml ? "html" : att.previewSvg ? "svg" : null;
   return (
     <div className="mt-3 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.06)]">
       <div className="flex items-center gap-3 px-4 py-3">
@@ -102,7 +103,7 @@ function AttachmentCard({ att }: { att: Attachment }) {
           <p className="truncate text-[13px] font-medium text-slate-800">{att.filename}</p>
           <p className="text-[11px] text-slate-400">{formatSize(att.size)}</p>
         </div>
-        {canPreview && (
+        {previewKind && (
           <button
             onClick={() => setShowPreview((v) => !v)}
             className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-brand-600 transition-colors hover:bg-brand-50"
@@ -118,16 +119,25 @@ function AttachmentCard({ att }: { att: Attachment }) {
           下载
         </a>
       </div>
-      {canPreview && showPreview && (
+      {previewKind && showPreview && (
         <div className="border-t border-slate-100 bg-slate-50/60 p-4">
-          {/* sandboxed iframe：SVG 内容来自模型输入，隔离执行 */}
-          <iframe
-            title={att.filename}
-            sandbox=""
-            srcDoc={att.previewSvg!}
-            className="max-h-[480px] w-full rounded-xl border border-slate-200 bg-white"
-            style={{ minHeight: 240 }}
-          />
+          {previewKind === "html" ? (
+            /* allow-scripts：页面可交互；无 allow-same-origin，拿不到父页面和本地存储 */
+            <iframe
+              title={att.filename}
+              sandbox="allow-scripts"
+              srcDoc={att.previewHtml!}
+              className="h-[480px] w-full rounded-xl border border-slate-200 bg-white"
+            />
+          ) : (
+            <iframe
+              title={att.filename}
+              sandbox=""
+              srcDoc={att.previewSvg!}
+              className="max-h-[480px] w-full rounded-xl border border-slate-200 bg-white"
+              style={{ minHeight: 240 }}
+            />
+          )}
         </div>
       )}
     </div>
@@ -267,6 +277,7 @@ export default function ChatPage() {
               mime: String(a.mime_type ?? a.mime ?? ""),
               size: Number(a.size_bytes ?? a.size ?? 0),
               previewSvg: (a.preview_svg ?? a.previewSvg ?? null) as string | null,
+              previewHtml: (a.preview_html ?? a.previewHtml ?? null) as string | null,
             })),
           })
         )

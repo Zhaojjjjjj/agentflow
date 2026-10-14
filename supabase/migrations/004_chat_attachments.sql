@@ -7,8 +7,12 @@ create table if not exists chat_attachments (
   mime_type text not null default 'application/octet-stream',
   content_text text not null,
   preview_svg text,
+  preview_html text,
   size_bytes int not null default 0,
   created_at timestamptz not null default now()
 );
 create index if not exists idx_chat_att_conv on chat_attachments(conversation_id);
 create index if not exists idx_chat_att_msg on chat_attachments(message_id);
+
+-- 已执行过 004 的库补这一列：
+-- alter table chat_attachments add column if not exists preview_html text;

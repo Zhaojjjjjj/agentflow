@@ -31,11 +31,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     .limit(200);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   const msgIds = (data ?? []).map((m) => m.id);
-  let attachments: { id: string; message_id: string; filename: string; mime_type: string; size_bytes: number; preview_svg: string | null }[] = [];
+  let attachments: { id: string; message_id: string; filename: string; mime_type: string; size_bytes: number; preview_svg: string | null; preview_html: string | null }[] = [];
   if (msgIds.length > 0) {
     const { data: atts } = await sb
       .from("chat_attachments")
-      .select("id, message_id, filename, mime_type, size_bytes, preview_svg")
+      .select("id, message_id, filename, mime_type, size_bytes, preview_svg, preview_html")
       .in("message_id", msgIds)
       .order("created_at", { ascending: true });
     attachments = (atts ?? []) as typeof attachments;

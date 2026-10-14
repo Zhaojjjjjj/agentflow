@@ -22,6 +22,7 @@ interface PendingAttachment {
   mime: string;
   size: number;
   previewSvg: string | null;
+  previewHtml: string | null;
 }
 
 /** POST /api/chat — send a message, stream the assistant reply (SSE). */
@@ -161,6 +162,7 @@ export async function POST(req: NextRequest) {
                     mime_type: f.mime,
                     content_text: f.content,
                     preview_svg: f.previewSvg ?? null,
+                    preview_html: f.previewHtml ?? null,
                     size_bytes: Buffer.byteLength(f.content, "utf8"),
                   })
                   .select("id")
@@ -172,6 +174,7 @@ export async function POST(req: NextRequest) {
                     mime: f.mime,
                     size: Buffer.byteLength(f.content, "utf8"),
                     previewSvg: f.previewSvg ?? null,
+                    previewHtml: f.previewHtml ?? null,
                   });
                 }
                 fileSummaries.push(f.filename);
