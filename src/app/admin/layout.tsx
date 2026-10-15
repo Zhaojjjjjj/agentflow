@@ -33,17 +33,6 @@ const MENUS = [
       </svg>
     ),
   },
-  {
-    href: "/admin/workflows",
-    label: "工作流管理",
-    icon: (
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-        <rect x="1.5" y="1.5" width="5.5" height="5.5" rx="1.5" stroke="currentColor" strokeWidth="1.6" />
-        <rect x="9" y="9" width="5.5" height="5.5" rx="1.5" stroke="currentColor" strokeWidth="1.6" />
-        <path d="M7 4.5h4.5V9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    ),
-  },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

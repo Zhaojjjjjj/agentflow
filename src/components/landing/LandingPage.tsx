@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { Inter, Instrument_Serif } from "next/font/google";
-import { NODE_META, type NodeType } from "@/lib/engine/types";
 import WorkflowDemo from "./WorkflowDemo";
 import DagFlowMini from "./DagFlowMini";
 import Reveal from "./Reveal";
@@ -134,18 +133,6 @@ const BENTO: {
     desc: "关键节点暂停等人确认，Human-in-the-loop 原生支持。",
     art: <ApprovalMini />,
   },
-];
-
-const NODE_ORDER: NodeType[] = [
-  "trigger-manual",
-  "trigger-schedule",
-  "llm",
-  "rag-retrieve",
-  "http-request",
-  "condition",
-  "loop",
-  "human-approval",
-  "output",
 ];
 
 const CURL = `curl -X POST https://your-app.vercel.app/api/public/workflows/$WORKFLOW_ID/run \\
@@ -334,16 +321,17 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ---------- node marquee ---------- */}
-      <section id="nodes" className="overflow-hidden border-t border-slate-200/70 bg-slate-50/50 py-24">
+      {/* ---------- studio features ---------- */}
+      <section id="studio" className="overflow-hidden border-t border-slate-200/70 bg-slate-50/50 py-24">
         <div className="mx-auto max-w-6xl px-6">
           <SectionHead
-            micro="Node catalog"
+            micro="Serial studio"
             title={
               <>
-                9 种节点，拼出<span className={`${serif.className} italic text-[#7C3AED]`}>任意</span>流程
+                为<span className={`${serif.className} italic text-[#7C3AED]`}>连载</span>而生的创作工作室
               </>
             }
+            desc="小说与网剧剧本，一集一集往下写。每一集都完整，每一集都记得之前发生过什么。"
           />
         </div>
         <Reveal className="mt-12">
@@ -355,23 +343,28 @@ export default function LandingPage() {
             }}
           >
             <div className="marquee-track flex w-max gap-4 pr-4">
-              {[...NODE_ORDER, ...NODE_ORDER].map((t, i) => {
-                const meta = NODE_META[t];
-                return (
-                  <div
-                    key={`${t}-${i}`}
-                    className="flex w-64 shrink-0 items-start gap-3 rounded-2xl border border-slate-200 bg-white p-5"
-                  >
-                    <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: meta.color }} />
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-slate-800">{meta.label}</p>
-                      <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.16em] text-slate-400">
-                        {meta.category}
-                      </p>
-                    </div>
+              {[
+                ["大纲先行", "Outline", "全书 → 分卷 → 单集三级大纲，单集完整有起承转合"],
+                ["前情记忆", "Memory", "每集自动生成剧情摘要，写新集时自动召回相关前情"],
+                ["人物卡", "Characters", "人物小传、性格、关系、当前状态，AI 持续维护"],
+                ["伏笔追踪", "Plot threads", "埋了哪些伏笔、在哪集回收，一目了然"],
+                ["人工审稿", "Review", "大纲和正文都可审可改，确认后再往下写"],
+                ["双形态", "Novel & Drama", "长篇小说与网剧剧本，一套工作流两种输出"],
+              ].flatMap((c) => [c, c]).map(([title, micro, desc], i) => (
+                <div
+                  key={`${title}-${i}`}
+                  className="flex w-64 shrink-0 items-start gap-3 rounded-2xl border border-slate-200 bg-white p-5"
+                >
+                  <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-[#7C3AED]" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-slate-800">{title}</p>
+                    <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.16em] text-slate-400">
+                      {micro}
+                    </p>
+                    <p className="mt-1.5 text-[13px] leading-5 text-slate-500">{desc}</p>
                   </div>
-                );
-              })}
+                </div>
+              ))}
             </div>
           </div>
         </Reveal>

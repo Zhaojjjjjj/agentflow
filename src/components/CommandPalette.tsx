@@ -3,27 +3,28 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
-interface WF {
+interface Project {
   id: string;
-  name: string;
+  title: string;
+  kind: string;
 }
 
 interface Item {
   id: string;
   label: string;
   sub?: string;
-  kind: "action" | "nav" | "workflow";
+  kind: "action" | "nav" | "project";
   run: () => void;
 }
 
 /**
- * Cmd+K / Ctrl+K 命令面板：搜索工作流、快速跳转、常用操作。
+ * Cmd+K / Ctrl+K 命令面板：搜索作品、快速跳转、常用操作。
  * 通过 `agentflow:open-palette` 事件也可从 TopNav 的 ⌘K 按钮打开。
  */
 export default function CommandPalette() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [workflows, setWorkflows] = useState<WF[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [index, setIndex] = useState(0);
   const router = useRouter();
   const pathname = usePathname();
@@ -54,14 +55,15 @@ export default function CommandPalette() {
     setQuery("");
     setIndex(0);
     const t = setTimeout(() => inputRef.current?.focus(), 40);
-    fetch("/api/workflows")
+    fetch("/api/studio/projects")
       .then((r) => r.json())
       .then((j) => {
-        if (Array.isArray(j.workflows)) {
-          setWorkflows(
-            j.workflows.map((w: { id: string; name: string }) => ({
+        if (Array.isArray(j.projects)) {
+          setProjects(
+            j.projects.map((w: { id: string; title: string; kind: string }) => ({
               id: w.id,
-              name: w.name || "未命名工作流",
+              title: w.title || "未命名作品",
+              kind: w.kind,
             }))
           );
         }
@@ -78,13 +80,13 @@ export default function CommandPalette() {
     [router]
   );
 
-  const createWorkflow = useCallback(() => {
+  const createProject = useCallback(() => {
     setOpen(false);
     if (pathname === "/") {
-      window.dispatchEvent(new Event("agentflow:create-workflow"));
+      window.dispatchEvent(new Event("agentflow:create-project"));
     } else {
       router.push("/");
-      window.setTimeout(() => window.dispatchEvent(new Event("agentflow:create-workflow")), 600);
+      window.setTimeout(() => window.dispatchEvent(new Event("agentflow:create-project")), 600);
     }
   }, [pathname, router]);
 
@@ -99,27 +101,27 @@ export default function CommandPalette() {
     const q = query.trim().toLowerCase();
     const match = (s: string) => !q || s.toLowerCase().includes(q);
     const list: Item[] = [];
-    if (match("新建工作流") || match("new workflow") || match("create")) {
-      list.push({ id: "act-new", label: "新建工作流", sub: "动作", kind: "action", run: createWorkflow });
+    if (match("新建作品") || match("new") || match("create")) {
+      list.push({ id: "act-new", label: "新建作品", sub: "动作", kind: "action", run: createProject });
     }
     const navs = [
-      { label: "工作流列表", href: "/" },
-      { label: "API Keys", href: "/api-keys" },
+      { label: "工作室", href: "/" },
+      { label: "Luna", href: "/chat" },
       { label: "LLM 配置", href: "/admin/llm" },
     ];
     for (const n of navs) {
       if (match(n.label)) list.push({ id: `nav-${n.href}`, label: `前往${n.label}`, sub: "导航", kind: "nav", run: () => go(n.href) });
     }
-    for (const w of workflows) {
-      if (match(w.name)) {
-        list.push({ id: `wf-${w.id}`, label: w.name, sub: "工作流", kind: "workflow", run: () => go(`/workflows/${w.id}`) });
+    for (const w of projects) {
+      if (match(w.title)) {
+        list.push({ id: `pj-${w.id}`, label: w.title, sub: w.kind === "drama" ? "短剧" : "小说", kind: "project", run: () => go(`/studio/${w.id}`) });
       }
     }
     if (match("退出登录") || match("logout")) {
       list.push({ id: "act-logout", label: "退出登录", sub: "动作", kind: "action", run: logout });
     }
     return list.slice(0, 12);
-  }, [query, workflows, go, createWorkflow, logout]);
+  }, [query, projects, go, createProject, logout]);
 
   useEffect(() => {
     setIndex(0);
@@ -163,7 +165,7 @@ export default function CommandPalette() {
             ref={inputRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="搜索工作流、页面或操作…"
+            placeholder="搜索作品、页面或操作…"
             className="h-12 w-full bg-transparent text-sm outline-none placeholder:text-slate-400"
           />
           <kbd className="kbd">esc</kbd>
@@ -183,7 +185,7 @@ export default function CommandPalette() {
             >
               <span
                 className={`h-2 w-2 shrink-0 rounded-full ${
-                  it.kind === "workflow" ? "bg-brand-500" : it.kind === "nav" ? "bg-slate-300" : "bg-emerald-400"
+                  it.kind === "project" ? "bg-brand-500" : it.kind === "nav" ? "bg-slate-300" : "bg-emerald-400"
                 }`}
               />
               <span className="flex-1 truncate text-slate-800">{it.label}</span>

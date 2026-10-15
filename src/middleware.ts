@@ -4,13 +4,10 @@ import { SESSION_COOKIE, getSessionClaims } from "@/lib/auth";
 
 // ---- 拦截规则 ----
 // 页面：控制台页面（`/` 为公开落地页，不拦截）
-const PAGE_PREFIXES = ["/workflows", "/runs", "/api-keys", "/settings", "/admin", "/account", "/chat"];
+const PAGE_PREFIXES = ["/settings", "/admin", "/account", "/chat", "/studio"];
 // 内部 API：控制台调用的全部数据接口
 const API_PREFIXES = [
-  "/api/workflows",
-  "/api/runs",
-  "/api/documents",
-  "/api/api-keys",
+  "/api/studio",
   "/api/settings",
   "/api/admin",
   "/api/auth/me",
@@ -53,7 +50,7 @@ export async function middleware(req: NextRequest) {
   if (adminOnly && claims.role !== "admin") {
     if (api) return NextResponse.json({ error: "需要管理员权限" }, { status: 403 });
     const home = req.nextUrl.clone();
-    home.pathname = "/workflows";
+    home.pathname = "/";
     home.search = "";
     return NextResponse.redirect(home);
   }
@@ -63,17 +60,12 @@ export async function middleware(req: NextRequest) {
 
 export const config = {
   matcher: [
-    "/workflows/:path*",
-    "/runs/:path*",
-    "/api-keys/:path*",
     "/settings/:path*",
     "/admin/:path*",
     "/account/:path*",
     "/chat/:path*",
-    "/api/workflows/:path*",
-    "/api/runs/:path*",
-    "/api/documents/:path*",
-    "/api/api-keys/:path*",
+    "/studio/:path*",
+    "/api/studio/:path*",
     "/api/settings/:path*",
     "/api/admin/:path*",
     "/api/auth/me",

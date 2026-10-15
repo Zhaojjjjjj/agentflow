@@ -37,28 +37,16 @@ export function forbidden(msg = "需要管理员权限") {
   return NextResponse.json({ error: msg }, { status: 403 });
 }
 
-/** Whether the user may access the workflow (admin bypasses ownership). */
-export async function canAccessWorkflow(workflowId: string, me: AuthUser): Promise<boolean> {
-  if (!workflowId) return false;
+/** Whether the user may access the story project (admin bypasses ownership). */
+export async function canAccessProject(projectId: string, me: AuthUser): Promise<boolean> {
+  if (!projectId) return false;
   const sb = getSupabase();
   const { data, error } = await sb
-    .from("workflows")
+    .from("story_projects")
     .select("id, owner_id")
-    .eq("id", workflowId)
+    .eq("id", projectId)
     .maybeSingle();
   if (error || !data) return false;
   if (me.role === "admin") return true;
-  return (data as { owner_id: string | null }).owner_id === me.id;
-}
-
-/**
- * Workflow ids visible to the user. Returns null for admin (sees all).
- * Used to scope list queries (runs, api-keys, ...).
- */
-export async function visibleWorkflowIds(me: AuthUser): Promise<string[] | null> {
-  if (me.role === "admin") return null;
-  const sb = getSupabase();
-  const { data, error } = await sb.from("workflows").select("id").eq("owner_id", me.id);
-  if (error) return [];
-  return (data ?? []).map((r) => (r as { id: string }).id);
+  return (data as { owner_id: string }).owner_id === me.id;
 }

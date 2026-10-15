@@ -12,9 +12,8 @@ export default function TopNav() {
   const openPalette = () => window.dispatchEvent(new Event("agentflow:open-palette"));
 
   const NAV = [
-    { href: "/", label: "工作流" },
+    { href: "/", label: "工作室" },
     { href: "/chat", label: "Luna" },
-    { href: "/api-keys", label: "API Keys" },
     ...(me?.role === "admin" ? [{ href: "/admin", label: "管理后台" }] : []),
   ];
 

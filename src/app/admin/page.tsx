@@ -6,10 +6,10 @@ import { PageHeader, Skeleton } from "@/components/ui";
 
 interface Overview {
   users: number;
-  workflows: number;
-  runs: number;
-  tokens: number;
-  cost_usd: number;
+  projects: number;
+  episodes: number;
+  published: number;
+  words: number;
 }
 interface DayPoint {
   date: string;
@@ -103,8 +103,6 @@ function Leaderboard({ rows }: { rows: LeaderRow[] }) {
 
 export default function AdminOverviewPage() {
   const [overview, setOverview] = useState<Overview | null>(null);
-  const [days, setDays] = useState<DayPoint[]>([]);
-  const [leaders, setLeaders] = useState<LeaderRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -113,8 +111,6 @@ export default function AdminOverviewPage() {
       .then((s) => {
         if (s.error) throw new Error(s.error);
         setOverview(s.overview);
-        setDays(s.daily);
-        setLeaders(s.leaderboard);
       })
       .catch((e) => toast.error(e instanceof Error ? e.message : "加载失败"))
       .finally(() => setLoading(false));
@@ -123,10 +119,10 @@ export default function AdminOverviewPage() {
   const cards = overview
     ? [
         { label: "用户数", value: String(overview.users) },
-        { label: "工作流", value: String(overview.workflows) },
-        { label: "运行次数", value: fmtNum(overview.runs) },
-        { label: "Token 消耗", value: fmtNum(overview.tokens) },
-        { label: "预估费用", value: `$${overview.cost_usd.toFixed(4)}` },
+        { label: "作品数", value: String(overview.projects) },
+        { label: "总集数", value: String(overview.episodes) },
+        { label: "已发布", value: String(overview.published) },
+        { label: "总字数", value: fmtNum(overview.words) },
       ]
     : [];
 
@@ -147,16 +143,6 @@ export default function AdminOverviewPage() {
             ))}
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-5">
-            <div className="card p-5 lg:col-span-3">
-              <h3 className="mb-4 text-sm font-semibold text-slate-800">近 14 天运行趋势</h3>
-              <TrendChart days={days} />
-            </div>
-            <div className="card p-5 lg:col-span-2">
-              <h3 className="mb-4 text-sm font-semibold text-slate-800">用户 Token 消耗排行</h3>
-              <Leaderboard rows={leaders} />
-            </div>
-          </div>
         </>
       )}
     </main>
