@@ -62,6 +62,7 @@ export const executeWorkflowFn = inngest.createFunction(
           estimated_cost_usd: totals.cost,
           finished_at: new Date().toISOString(),
         })
+        .neq("status", "cancelled")
         .eq("id", runId);
       return { runId, status: "succeeded" };
     } catch (e) {
@@ -77,6 +78,7 @@ export const executeWorkflowFn = inngest.createFunction(
             estimated_cost_usd: totals.cost,
             finished_at: new Date().toISOString(),
           })
+          .neq("status", "cancelled")
           .eq("id", runId);
         return { runId, status: "rejected" };
       }
@@ -89,6 +91,7 @@ export const executeWorkflowFn = inngest.createFunction(
           estimated_cost_usd: totals.cost,
           finished_at: new Date().toISOString(),
         })
+        .neq("status", "cancelled")
         .eq("id", runId);
       throw e;
     }

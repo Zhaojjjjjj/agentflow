@@ -145,6 +145,28 @@ export default function RunDetailPage({ params }: { params: Promise<{ runId: str
             <div className="flex items-center gap-2">
               {run ? <StatusBadge status={run.status} /> : <span className="text-sm text-slate-400">加载中…</span>}
               {run && <Badge tone="gray">{run.trigger}</Badge>}
+              {run && ["queued", "running", "waiting_approval"].includes(run.status) && (
+                <button
+                  disabled={busy}
+                  onClick={async () => {
+                    if (!confirm("确定要手动结束这次运行吗？执行器不会再更新它的状态。")) return;
+                    setBusy(true);
+                    try {
+                      const res = await fetch(`/api/runs/${runId}/cancel`, { method: "POST" });
+                      const j = await res.json();
+                      if (!res.ok) throw new Error(j.error || "操作失败");
+                      setRun({ ...run, status: "cancelled", finished_at: new Date().toISOString() });
+                    } catch (e) {
+                      alert(e instanceof Error ? e.message : "操作失败");
+                    } finally {
+                      setBusy(false);
+                    }
+                  }}
+                  className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs text-slate-500 transition-colors hover:border-red-200 hover:text-red-600 disabled:opacity-50"
+                >
+                  结束运行
+                </button>
+              )}
             </div>
           </StatCard>
           <StatCard label="Token 消耗">

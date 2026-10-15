@@ -106,7 +106,7 @@ export async function createRun(opts: {
       total_tokens: stats.tokens,
       estimated_cost_usd: stats.cost,
       finished_at: new Date().toISOString(),
-    }).eq("id", runId);
+    }).neq("status", "cancelled").eq("id", runId);
     return { runId, mode: "sync" };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -117,7 +117,7 @@ export async function createRun(opts: {
       total_tokens: stats.tokens,
       estimated_cost_usd: stats.cost,
       finished_at: new Date().toISOString(),
-    }).eq("id", runId);
+    }).neq("status", "cancelled").eq("id", runId);
     throw e;
   }
 }
