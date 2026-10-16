@@ -1,8 +1,15 @@
-# AgentFlow · 可视化 AI Agent 工作流编排与执行平台
+# AgentFlow · AI 连载创作平台
 
-拖拽编排 AI Agent 工作流：LLM 调用、HTTP 工具、条件分支、循环、RAG 检索、人工审批，一键运行并可发布为 HTTP API。
+小说与网剧剧本的连载工作室：定下世界观，AI 帮你一集一集写下去——每一集剧情完整，每一集都记得之前发生过什么。
 
-Serverless 架构：**Next.js 15 全栈**（Vercel 部署）+ **Supabase Postgres/pgvector**（数据库）+ **Upstash Redis**（可选）+ **Inngest**（durable 执行引擎）。
+- **大纲先行**：全书 → 分卷 → 单集三级大纲，每集起承转合完整
+- **前情记忆**：每集自动生成剧情摘要，向量召回相关的前情与伏笔
+- **人物卡**：人物小传、性格、关系、当前状态，AI 随剧情持续维护
+- **伏笔追踪**：埋了哪些钩子、在哪集回收，一目了然
+- **人工审稿**：大纲和正文都可审可改，确认之后才往下写
+- **双形态**：长篇小说 / 网剧剧本
+
+Serverless 架构：**Next.js 15 全栈**（Vercel 部署）+ **Supabase Postgres/pgvector**（故事库）+ **Inngest**（写集流水线异步执行）。
 
 ## 架构
 
@@ -10,37 +17,37 @@ Serverless 架构：**Next.js 15 全栈**（Vercel 部署）+ **Supabase Postgre
 ┌─────────────────────────────────────────────────────────────┐
 │                      Next.js 15 (Vercel)                      │
 │  ┌──────────────┐  ┌──────────────────────────────────────┐  │
-│  │  React Flow  │  │            Route Handlers            │  │
-│  │  画布编辑器   │  │  /api/workflows  /api/runs          │  │
-│  │  zustand 状态 │  │  /api/runs/[id]/stream (SSE)        │  │
-│  └──────────────┘  │  /api/public/.../run (API Key 鉴权)   │  │
-│                    │  /api/inngest (Inngest serve)        │  │
+│  │ 创作工作室    │  │            Route Handlers            │  │
+│  │ 作品/连载流   │  │  /api/studio/projects                │  │
+│  │ 人物/伏笔面板 │  │  /api/studio/projects/[id]/episodes  │  │
+│  └──────────────┘  │  /api/inngest (Inngest serve)        │  │
 │                    └──────────────────────────────────────┘  │
 └──────────────────────────────┬──────────────────────────────┘
                                │
         ┌──────────────────────┼──────────────────────┐
         ▼                      ▼                      ▼
 ┌───────────────┐    ┌──────────────────┐    ┌────────────────┐
-│   Supabase    │    │     Inngest      │    │ Upstash Redis  │
-│ Postgres +    │    │ durable function │    │ 运行锁 / 限流  │
-│ pgvector      │    │ step.run 逐节点  │    │ 未配置时降级   │
-│ workflows     │    │ waitForEvent     │    └────────────────┘
-│ workflow_runs │    │ 人工审批暂停     │
-│ run_steps     │    │ cron 定时触发    │
-│ documents     │    └──────────────────┘
-└───────────────┘
-        │
-        ▼
-┌───────────────────────────────────────────────┐
-│ LLM 层 (OpenAI 兼容协议，多 Provider fallback)  │
-│ chat completions → token 统计 → 成本估算       │
-│ embeddings → pgvector 相似检索 (RAG)           │
-└───────────────────────────────────────────────┘
+│   Supabase    │    │     Inngest      │    │   LLM 层       │
+│ Postgres +    │    │ 写集流水线        │    │ OpenAI 兼容协议 │
+│ pgvector      │    │ 大纲→审稿→扩写   │    │ 多 Provider    │
+│ story_projects│    │ →记忆入库        │    │ fallback       │
+│ episodes      │    │                  │    │ embeddings →   │
+│ story_documents│   │                  │    │ pgvector 召回  │
+└───────────────┘    └──────────────────┘    └────────────────┘
 ```
 
-执行流程：控制台/定时/API 触发 → 创建 `workflow_runs` → Inngest `executeWorkflow`
-按 DAG 拓扑逐节点 `step.run` 执行 → 每节点写 `run_steps` trace → SSE 推送进度 →
-人工审批节点 `waitForEvent` 暂停 → 批准/拒绝后继续。
+写一集流程：前情检索（摘要 + 人物 + 伏笔 + 向量召回）→ 生成本集大纲 → 人工审稿确认 → 分节扩写正文 → 一致性自检 → 记忆入库（摘要/人物变化/伏笔更新）。
+
+## 数据模型
+
+| 表 | 说明 |
+|---|---|
+| `story_projects` | 作品：类型（小说/网剧）、题材、梗概、世界观、风格、单集字数 |
+| `story_characters` | 人物卡：小传、性格、外貌、关系、当前状态 |
+| `episodes` | 集：集号、大纲、正文、字数、状态（草稿/审稿中/已发布） |
+| `plot_threads` | 伏笔：描述、埋下集号、回收集号、状态 |
+| `story_documents` | 记忆库：剧情摘要/设定片段 + 1024 维向量 |
+| `episode_jobs` | 写集任务：进度、状态、错误信息 |
 
 ## 从零搭建
 
@@ -48,14 +55,22 @@ Serverless 架构：**Next.js 15 全栈**（Vercel 部署）+ **Supabase Postgre
 
 | 服务 | 用途 | 备注 |
 |---|---|---|
-| [Supabase](https://supabase.com) | Postgres + pgvector | 数据库与向量检索 |
-| [Upstash](https://upstash.com) | Redis（可选） | 未配置时自动降级 |
-| [Inngest](https://inngest.com) | durable 执行 | 异步执行 / 定时 / 人工审批必需 |
+| [Supabase](https://supabase.com) | Postgres + pgvector | 故事库与向量检索 |
+| [Inngest](https://inngest.com) | 异步执行 | 写集流水线必需 |
 
 ### 2. 建表
 
-在 Supabase Dashboard → SQL Editor 中执行 `supabase/schema.sql`（含 pgvector 扩展、表、向量索引、`match_documents` 函数），
-然后执行 `supabase/migrations/001_llm_providers.sql`（LLM 供应商注册表）。
+在 Supabase Dashboard → SQL Editor 中按顺序执行：
+
+```
+supabase/migrations/001_llm_providers.sql
+supabase/migrations/002_users.sql
+supabase/migrations/003_chat.sql
+supabase/migrations/004_chat_attachments.sql
+supabase/migrations/006_studio.sql
+```
+
+> `005_drop_workflows.sql` 仅用于从旧版本升级（删除已废弃的工作流表），全新部署跳过。
 
 ### 3. 配置环境变量
 
@@ -68,28 +83,13 @@ openssl rand -hex 32
 | 变量 | 说明 |
 |---|---|
 | `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` | Supabase 项目设置 → API |
-| `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | 可选，未配置时自动降级 |
-| `INNGEST_EVENT_KEY` / `INNGEST_SIGNING_KEY` | Inngest → Keys；异步执行/定时/审批必需 |
-| `APP_ENCRYPTION_KEY` | `openssl rand -hex 32` 生成的 64 位 hex；后台增删 LLM 供应商必需（缺失时写操作直接报错） |
+| `INNGEST_EVENT_KEY` / `INNGEST_SIGNING_KEY` | Inngest → Keys；写集流水线必需 |
+| `APP_ENCRYPTION_KEY` | `openssl rand -hex 32` 生成的 64 位 hex；后台增删 LLM 供应商必需 |
 | `ADMIN_USERNAME` / `ADMIN_PASSWORD` | 控制台登录账号；用户名默认 `admin01`，密码必填 |
 | `AUTH_SECRET` | 会话签名密钥；不填则回退到 `APP_ENCRYPTION_KEY` |
 | `LLM_PROVIDER_1_*` | 主 LLM（OpenAI 兼容：baseURL/key/model），可配多个按顺序降级；也可在后台配置后留空 |
-| `LLM_EMBEDDING_*` | RAG 向量化（baseURL/key/model/dimensions，需与表结构一致，默认 1024）；也可在后台配置后留空 |
+| `LLM_EMBEDDING_*` | 前情记忆向量化（baseURL/key/model/dimensions，需与表结构一致，默认 1024）；也可在后台配置后留空 |
 | `NEXT_PUBLIC_APP_URL` | 部署后的公网地址 |
-
-### 3.5 后台配置 LLM（推荐，不用改环境变量）
-
-打开 **LLM 设置** 页面（首页右上角），可视化管理供应商：
-
-- **供应商列表**：对话 / 向量分组展示，显示模型、Base URL、Key 掩码（`****abcd`，明文永不回显）、启用状态、优先级
-- **新增 / 编辑 / 删除**：Key 经 AES-256-GCM 加密后入库，密钥来自 `APP_ENCRYPTION_KEY`；编辑时 Key 留空即不修改
-- **启用 / 禁用**：一键开关；**↑ ↓** 调整优先级（对话供应商按优先级从上到下依次试错）
-- **测试连接**：服务端先调 `GET /models`，不通则发一次最小 chat 调用，返回成功/失败 + 耗时
-- **从环境变量导入**：一键把 `LLM_PROVIDER_{i}_*` 写入数据库（按名称幂等，已存在则跳过）
-
-解析顺序：**数据库优先**（`enabled=true`，按 `priority` 排序），数据库为空或迁移未执行时自动回退到环境变量——执行器无感切换。
-
-> 注意：向量供应商的 `dimensions` 须与 `documents.embedding` 的向量维度一致（默认 1024），否则入库会失败。
 
 ### 4. 本地运行
 
@@ -97,7 +97,7 @@ openssl rand -hex 32
 npm install
 npx tsc --noEmit
 npm run dev
-# 另开终端启动 Inngest 本地服务（异步执行/定时/审批需要）：
+# 另开终端启动 Inngest 本地服务（写集流水线需要）：
 npx inngest-cli@latest dev
 ```
 
@@ -105,44 +105,33 @@ npx inngest-cli@latest dev
 
 ### 5. 部署到 Vercel
 
-1. `git init && git add -A && git commit` 后推送到 GitHub（本仓库已初始化 main 分支，未 push）。
+1. 推送到 GitHub。
 2. Vercel → New Project → 导入仓库，填入上述环境变量。
 3. 在 [Inngest Dashboard](https://app.inngest.com) → Apps → 添加 `https://你的域名/api/inngest`（生产环境用 Signing Key 验证）。
-4. 定时触发依赖 Inngest 的 cron（`schedule-tick` 每分钟检查），本地 dev 同理。
 
-## 节点目录
+## 后台配置 LLM（推荐，不用改环境变量）
 
-| 节点 | 说明 |
-|---|---|
-| 手动触发 | 控制台/API 手动启动，`{{input.xxx}}` 引用输入 |
-| 定时触发 | cron（UTC）定时自动运行 |
-| 大模型 | OpenAI 兼容调用，模板变量，多 Provider 降级，token/成本统计 |
-| HTTP 请求 | GET/POST/PUT/PATCH/DELETE，超时与失败策略可配 |
-| 条件分支 | 表达式（如 `{{score}} > 0.8`）走 true/false 分支 |
-| 循环 | 遍历数组执行内部子流程，最大迭代保护，防嵌套过深 |
-| 知识检索 | pgvector 相似检索，输出 `{{nodeId.chunks}}` |
-| 人工审批 | `waitForEvent` 暂停，控制台批准/拒绝后继续（仅异步模式） |
-| 输出汇总 | 合并字段模板为最终结果 |
+打开管理后台的 **LLM 配置**页面，可视化管理供应商：
 
-模板变量：`{{nodeId.field}}`（如 `{{llm-1.text}}`）、`{{input.xxx}}`；循环内可用 `{{item}}` / `{{itemIndex}}`。
+- **供应商列表**：对话 / 向量分组展示，显示模型、Base URL、Key 掩码（`****abcd`，明文永不回显）、启用状态、优先级
+- **新增 / 编辑 / 删除**：Key 经 AES-256-GCM 加密后入库，密钥来自 `APP_ENCRYPTION_KEY`；编辑时 Key 留空即不修改
+- **启用 / 禁用**：一键开关；**↑ ↓** 调整优先级（对话供应商按优先级从上到下依次试错）
+- **测试连接**：服务端先调 `GET /models`，不通则发一次最小 chat 调用，返回成功/失败 + 耗时
+- **从环境变量导入**：一键把 `LLM_PROVIDER_{i}_*` 写入数据库（按名称幂等，已存在则跳过）
 
-## 发布为 API
+解析顺序：**数据库优先**（`enabled=true`，按 `priority` 排序），数据库为空或迁移未执行时自动回退到环境变量。
 
-工作流开启「发布」后：
+> 注意：向量供应商的 `dimensions` 须与 `story_documents.embedding` 的向量维度一致（默认 1024），否则入库会失败。
 
-```bash
-curl -X POST https://你的域名/api/public/workflows/<id>/run \
-  -H "x-api-key: af_xxx" \
-  -H "Content-Type: application/json" \
-  -d '{"input": {"topic": "AI"}, "mode": "async"}'
-# sync 模式直接返回 output；async 返回 runId，通过 /api/runs/[id] 查询
-```
+## Luna 对话助手
+
+控制台内置 AI 助手 Luna（`/chat`）：SSE 流式问答、8 个文件/图表技能（思维导图、文档、代码、表格、HTML 页面等）、对话附件预览。每日自动生成推荐题目，管理员可在后台一键刷新。
 
 ## 后续路线图
 
-- [ ] 节点重试策略可视化配置（次数/退避）
-- [ ] 工作流模板市场（一键导入示例）
-- [ ] 执行对比评测（同一输入跑多版本，token/质量对比）
-- [ ] 子工作流节点（复用已发布工作流）
-- [ ] Webhook 触发器节点
-- [ ] 多租户与团队协作（Supabase Auth + RLS）
+- [ ] 写一集流水线：前情检索 → 大纲生成 → 人工审稿 → 分节扩写 → 一致性自检 → 记忆入库
+- [ ] 向量记忆召回（BAAI/bge 系列 embedding，经后台 LLM 配置接入）
+- [ ] 网剧剧本格式：场次/地点/人物/动作/对白结构化编辑与导出
+- [ ] 长篇连载的卷级结构管理与全书总纲视图
+- [ ] 作品导出（Markdown / TXT / 剧本格式）
+- [ ] 多人协作：合著、审稿人角色
