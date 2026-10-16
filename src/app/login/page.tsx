@@ -10,83 +10,76 @@ function safeNext(raw: string | null): string {
   return "/";
 }
 
-/** 左侧深色视觉面板：CSS aurora + 隐约工作流 SVG 线条 + wordmark */
+/** 左侧视觉面板：浅色连载主题——集数时间线 + wordmark */
 function VisualPanel() {
   return (
-    <div className="relative hidden h-full w-full overflow-hidden bg-[#0A0A0F] md:block">
-      {/* aurora blobs */}
-      <div aria-hidden className="absolute inset-0">
-        <div
-          className="absolute -left-24 top-[8%] h-[420px] w-[420px] rounded-full blur-[110px]"
-          style={{
-            background: "radial-gradient(circle, rgba(124,58,237,0.42), transparent 65%)",
-            animation: "aurora-a 14s ease-in-out infinite",
-          }}
-        />
-        <div
-          className="absolute bottom-[4%] right-[-80px] h-[380px] w-[380px] rounded-full blur-[110px]"
-          style={{
-            background: "radial-gradient(circle, rgba(139,92,246,0.30), transparent 65%)",
-            animation: "aurora-b 18s ease-in-out infinite",
-          }}
-        />
-        <div
-          className="absolute left-[38%] top-[52%] h-[300px] w-[300px] rounded-full blur-[100px]"
-          style={{ background: "radial-gradient(circle, rgba(76,29,149,0.5), transparent 65%)" }}
-        />
-      </div>
+    <div className="relative hidden h-full w-full overflow-hidden border-r border-slate-200/70 bg-white md:block">
+      {/* 顶部淡紫光 */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 h-[420px]"
+        style={{ background: "radial-gradient(560px 280px at 50% -40px, rgba(124,58,237,0.10), transparent 70%)" }}
+      />
 
-      {/* subtle workflow line-work */}
-      <svg aria-hidden viewBox="0 0 600 800" preserveAspectRatio="xMidYMid slice" className="absolute inset-0 h-full w-full opacity-[0.35]">
-        <g fill="none" stroke="rgba(255,255,255,0.10)" strokeWidth={1.2}>
-          <path d="M-20 620 C 120 620, 140 480, 280 480 S 440 340, 620 340" />
-          <path d="M-20 700 C 140 700, 180 560, 320 560 S 480 420, 620 420" />
-          <path d="M-20 540 C 100 540, 160 400, 300 400" strokeDasharray="5 7" />
-        </g>
+      {/* 集数时间线 */}
+      <svg aria-hidden viewBox="0 0 600 800" preserveAspectRatio="xMidYMid slice" className="absolute inset-0 h-full w-full opacity-100">
         <g>
-          {[
-            [150, 585],
-            [300, 480],
-            [450, 392],
-          ].map(([x, y], i) => (
+          <line x1={90} y1={120} x2={90} y2={680} stroke="rgba(124,58,237,0.18)" strokeWidth={2} />
+          {(
+            [
+              [90, 170, true],
+              [90, 300, true],
+              [90, 430, true],
+              [90, 560, false],
+            ] as [number, number, boolean][]
+          ).map(([x, y, done], i) => (
             <g key={i}>
-              <circle cx={x} cy={y} r={16} fill="rgba(124,58,237,0.12)" stroke="rgba(139,92,246,0.45)" />
-              <circle cx={x} cy={y} r={3.5} fill="#A78BFA" />
+              <circle cx={x} cy={y} r={done ? 9 : 11} fill={done ? "#7C3AED" : "#fff"} stroke="#7C3AED" strokeWidth={2} strokeDasharray={done ? "none" : "4 3"} />
+              {done && <path d={`M ${x - 4} ${y} l 3 3 l 6 -6`} stroke="#fff" strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />}
             </g>
           ))}
         </g>
-        <circle r={3} fill="#C4B5FD" opacity={0.9}>
-          <animateMotion dur="9s" repeatCount="indefinite" path="M-20 620 C 120 620, 140 480, 280 480 S 440 340, 620 340" />
-        </circle>
+        <g fontFamily="ui-monospace, monospace" fontSize={13} fill="rgba(15,23,42,0.45)">
+          <text x={120} y={175}>第 10 集 · 已发布</text>
+          <text x={120} y={305}>第 11 集 · 已发布</text>
+          <text x={120} y={435}>第 12 集 · 已发布</text>
+          <text x={120} y={565} fill="#7C3AED" fontWeight={600}>第 13 集 · 撰写中</text>
+        </g>
+        <g opacity={0.5}>
+          <rect x={120} y={190} width={180} height={6} rx={3} fill="rgba(15,23,42,0.08)" />
+          <rect x={120} y={320} width={140} height={6} rx={3} fill="rgba(15,23,42,0.08)" />
+          <rect x={120} y={450} width={160} height={6} rx={3} fill="rgba(15,23,42,0.08)" />
+          <rect x={120} y={580} width={120} height={6} rx={3} fill="rgba(124,58,237,0.25)" />
+        </g>
       </svg>
 
       {/* content */}
       <div className="relative z-10 flex h-full flex-col justify-between p-12">
-        <p className="font-mono text-[11px] uppercase tracking-[0.28em] text-white/40">
-          Open source
+        <p className="font-mono text-[11px] uppercase tracking-[0.28em] text-slate-400">
+          AI Serial Studio
         </p>
         <div>
           <div className="flex items-center gap-3">
             <span className="h-4 w-4 rounded-full bg-[#7C3AED]" />
-            <span className="text-4xl font-semibold tracking-tight text-white">AgentFlow</span>
+            <span className="text-4xl font-semibold tracking-tight text-slate-900">AgentFlow</span>
           </div>
-          <p className="mt-5 max-w-sm text-[15px] leading-7 text-white/55">
-            可视化编排 AI Agent 工作流——从拖拽节点，到可靠执行，到一键发布为 API。
+          <p className="mt-5 max-w-sm text-[15px] leading-7 text-slate-500">
+            小说与网剧剧本的连载工作室——定下世界观，AI 帮你一集一集写下去。
           </p>
           <dl className="mt-10 flex gap-10">
             {[
-              ["9", "节点类型"],
-              ["DAG", "拓扑执行"],
-              ["API", "一键发布"],
+              ["双形态", "小说 · 网剧剧本"],
+              ["记忆", "前情自动召回"],
+              ["审稿", "人工确认再续写"],
             ].map(([v, k]) => (
               <div key={k}>
-                <dt className="font-mono text-base font-semibold text-white">{v}</dt>
-                <dd className="mt-1 font-mono text-[10px] uppercase tracking-[0.2em] text-white/40">{k}</dd>
+                <dt className="font-mono text-base font-semibold text-slate-900">{v}</dt>
+                <dd className="mt-1 font-mono text-[10px] uppercase tracking-[0.2em] text-slate-400">{k}</dd>
               </div>
             ))}
           </dl>
         </div>
-        <p className="font-mono text-[11px] text-white/30">durable execution · observable · human-in-the-loop</p>
+        <p className="font-mono text-[11px] text-slate-300">大纲先行 · 前情记忆 · 人工审稿</p>
       </div>
     </div>
   );
