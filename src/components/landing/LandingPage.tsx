@@ -330,7 +330,7 @@ export default function LandingPage() {
             micro="Features"
             title={
               <>
-                为生产级 Agent 应用<span className={`${serif.className} italic text-[#7C3AED]`}>而设计</span>
+                为连载创作<span className={`${serif.className} italic text-[#7C3AED]`}>而设计</span>
               </>
             }
           />
