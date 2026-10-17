@@ -407,7 +407,7 @@ export default function LandingPage() {
                 ["人物卡", "Characters", "人物小传、性格、关系、当前状态，AI 持续维护"],
                 ["伏笔追踪", "Plot threads", "埋了哪些伏笔、在哪集回收，一目了然"],
                 ["人工审稿", "Review", "大纲和正文都可审可改，确认后再往下写"],
-                ["双形态", "Novel & Drama", "长篇小说与网剧剧本，一套工作流两种输出"],
+                ["双形态", "Novel & Drama", "长篇小说与网剧剧本，一个故事两种形态"],
               ].flatMap((c) => [c, c]).map(([title, micro, desc], i) => (
                 <div
                   key={`${title}-${i}`}
