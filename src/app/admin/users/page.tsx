@@ -12,9 +12,9 @@ interface UserRow {
   avatar_url: string | null;
   role: string;
   created_at: string;
-  workflow_count: number;
-  run_count: number;
-  total_tokens: number;
+  project_count: number;
+  episode_count: number;
+  word_count: number;
 }
 
 function fmtNum(n: number): string {
@@ -223,9 +223,9 @@ export default function AdminUsersPage() {
                 <tr className="border-b border-slate-100 text-left text-xs text-slate-400">
                   <th className="pb-2 pr-4 font-medium">用户</th>
                   <th className="pb-2 pr-4 font-medium">角色</th>
-                  <th className="pb-2 pr-4 font-medium">工作流</th>
-                  <th className="pb-2 pr-4 font-medium">运行</th>
-                  <th className="pb-2 pr-4 font-medium">Token</th>
+                  <th className="pb-2 pr-4 font-medium">作品</th>
+                  <th className="pb-2 pr-4 font-medium">集数</th>
+                  <th className="pb-2 pr-4 font-medium">总字数</th>
                   <th className="pb-2 pr-4 font-medium">创建时间</th>
                   <th className="pb-2 text-right font-medium">操作</th>
                 </tr>
@@ -254,9 +254,9 @@ export default function AdminUsersPage() {
                         {u.role === "admin" ? "管理员" : "普通用户"}
                       </Badge>
                     </td>
-                    <td className="py-2.5 pr-4 font-mono text-xs text-slate-600">{u.workflow_count}</td>
-                    <td className="py-2.5 pr-4 font-mono text-xs text-slate-600">{u.run_count}</td>
-                    <td className="py-2.5 pr-4 font-mono text-xs text-slate-600">{fmtNum(u.total_tokens)}</td>
+                    <td className="py-2.5 pr-4 font-mono text-xs text-slate-600">{u.project_count}</td>
+                    <td className="py-2.5 pr-4 font-mono text-xs text-slate-600">{u.episode_count}</td>
+                    <td className="py-2.5 pr-4 font-mono text-xs text-slate-600">{fmtNum(u.word_count)}</td>
                     <td className="py-2.5 pr-4 text-xs text-slate-400">
                       {new Date(u.created_at).toLocaleDateString("zh-CN")}
                     </td>
@@ -314,7 +314,7 @@ export default function AdminUsersPage() {
       <ConfirmDialog
         open={!!deleteTarget}
         title="删除用户"
-        description={`确定删除用户「${deleteTarget?.username}」吗？其创建的工作流将保留但失去归属。`}
+        description={`确定删除用户「${deleteTarget?.username}」吗？其创建的作品、集数、人物与伏笔将一并删除。`}
         confirmLabel="删除"
         danger
         onClose={() => setDeleteTarget(null)}

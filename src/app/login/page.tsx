@@ -167,7 +167,7 @@ function LoginForm() {
             登录控制台
           </h1>
           <p className="mt-2 text-sm leading-6 text-slate-500">
-            管理工作流、运行记录与 LLM 供应商配置。
+            管理连载作品、人物与伏笔，以及 LLM 供应商配置。
           </p>
 
           <form onSubmit={submit} className="mt-8 space-y-4">

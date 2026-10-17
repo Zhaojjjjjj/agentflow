@@ -160,6 +160,7 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
   const [loading, setLoading] = useState(true);
   const [writing, setWriting] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [jobs, setJobs] = useState<Record<string, { stage: string; stageLabel: string; status: string; progress: string }>>({});
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/studio/projects/${projectId}`);
@@ -169,14 +170,16 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
     }
     const j = await res.json();
     if (res.ok) setProject(j.project);
-    const [e, c, t] = await Promise.all([
+    const [e, c, t, jb] = await Promise.all([
       fetch(`/api/studio/projects/${projectId}/episodes`).then((r) => r.json()).catch(() => ({})),
       fetch(`/api/studio/projects/${projectId}/characters`).then((r) => r.json()).catch(() => ({})),
       fetch(`/api/studio/projects/${projectId}/threads`).then((r) => r.json()).catch(() => ({})),
+      fetch(`/api/studio/projects/${projectId}/episode-jobs`).then((r) => r.json()).catch(() => ({})),
     ]);
     if (e.episodes) setEpisodes(e.episodes);
     if (c.characters) setCharacters(c.characters);
     if (t.threads) setThreads(t.threads);
+    if (jb.jobs) setJobs(jb.jobs);
     setLoading(false);
   }, [projectId, router]);
 
@@ -184,13 +187,24 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
     void load();
   }, [load]);
 
+  const hasRunning = Object.values(jobs).some((j) => j.status === "running");
+  useEffect(() => {
+    if (!hasRunning) return;
+    const t = setInterval(async () => {
+      const r = await fetch(`/api/studio/projects/${projectId}/episode-jobs`).then((x) => x.json()).catch(() => ({}));
+      if (r.jobs) setJobs(r.jobs);
+    }, 4000);
+    return () => clearInterval(t);
+  }, [hasRunning, projectId]);
+
   const writeNext = async () => {
     setWriting(true);
     try {
       const res = await fetch(`/api/studio/projects/${projectId}/episodes`, { method: "POST" });
       const j = await res.json();
       if (!res.ok) throw new Error(j.error || "创建失败");
-      toast.success(`第 ${j.number} 集已创建，写集流水线开发中`);
+      if (j.warning) toast.error(j.warning);
+      else toast.success(`第 ${j.number} 集已加入写作队列`);
       void load();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "创建失败");
@@ -265,17 +279,25 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
             <div className="space-y-3">
               {episodes.map((e) => {
                 const [label, tone] = EP_STATUS[e.status] ?? ["草稿", "gray"];
+                const job = jobs[e.id];
+                const jobActive = job && job.status === "running";
                 return (
-                  <div key={e.id} className="card flex items-center gap-4 p-4">
+                  <Link key={e.id} href={`/studio/${projectId}/episodes/${e.id}`} className="card flex items-center gap-4 p-4 transition-shadow hover:shadow-md">
                     <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-sm font-bold text-brand-700">
                       {e.number}
                     </span>
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-medium text-slate-900">{e.title || `第 ${e.number} 集`}</p>
-                      <p className="text-xs text-slate-400">{e.word_count > 0 ? `${e.word_count} 字` : "未成稿"}</p>
+                      <p className="text-xs text-slate-400">
+                        {jobActive ? `${job.stageLabel}… ${job.progress}` : e.word_count > 0 ? `${e.word_count} 字` : "未成稿"}
+                      </p>
                     </div>
-                    <Badge tone={tone}>{label}</Badge>
-                  </div>
+                    {jobActive && job.stage === "outline_review" ? (
+                      <Badge tone="amber">待审稿</Badge>
+                    ) : (
+                      <Badge tone={tone}>{label}</Badge>
+                    )}
+                  </Link>
                 );
               })}
             </div>

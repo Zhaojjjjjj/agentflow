@@ -32,14 +32,10 @@ export async function ensureSeeded(): Promise<void> {
   const username = getAdminUsername();
   const password = process.env.ADMIN_PASSWORD || "";
   if (!password) throw new Error("首次启动需要设置 ADMIN_PASSWORD 来创建管理员账号");
-  const { data, error: insErr } = await sb
+  const { error: insErr } = await sb
     .from("users")
-    .insert({ username, password_hash: await hashPassword(password), role: "admin" })
-    .select("id")
-    .single();
+    .insert({ username, password_hash: await hashPassword(password), role: "admin" });
   if (insErr) throw new Error(`创建管理员账号失败: ${insErr.message}`);
-  // Adopt workflows created before multi-user (owner_id null).
-  await sb.from("workflows").update({ owner_id: (data as { id: string }).id }).is("owner_id", null);
 }
 
 export async function getUserByUsername(username: string): Promise<DbUser | null> {

@@ -8,4 +8,7 @@ export const inngest = new Inngest({
 export const EVENTS = {
   RUN_REQUESTED: "agentflow/workflow.run.requested",
   APPROVAL_DECIDED: "agentflow/approval.decided",
+  // Studio 连载流水线
+  EPISODE_WRITE_REQUESTED: "studio/episode.write.requested",
+  OUTLINE_APPROVED: "studio/episode.outline.approved",
 } as const;

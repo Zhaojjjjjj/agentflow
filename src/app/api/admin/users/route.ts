@@ -12,37 +12,36 @@ export async function GET(req: NextRequest) {
   try {
     const users = await listUsers();
     const sb = getSupabase();
-    const { data: workflows } = await sb.from("workflows").select("id, owner_id");
-    const wfByOwner = new Map<string, number>();
-    const wfIds: string[] = [];
-    for (const w of (workflows ?? []) as { id: string; owner_id: string | null }[]) {
-      wfIds.push(w.id);
-      if (w.owner_id) wfByOwner.set(w.owner_id, (wfByOwner.get(w.owner_id) ?? 0) + 1);
+    const { data: projects } = await sb.from("story_projects").select("id, owner_id");
+    const projList = (projects ?? []) as { id: string; owner_id: string | null }[];
+    const projByOwner = new Map<string, number>();
+    const projIds: string[] = [];
+    const projOwnerById = new Map<string, string | null>();
+    for (const p of projList) {
+      projIds.push(p.id);
+      projOwnerById.set(p.id, p.owner_id);
+      if (p.owner_id) projByOwner.set(p.owner_id, (projByOwner.get(p.owner_id) ?? 0) + 1);
     }
-    let runs: { workflow_id: string; total_tokens: number }[] = [];
-    if (wfIds.length > 0) {
-      const { data } = await sb.from("workflow_runs").select("workflow_id, total_tokens").in("workflow_id", wfIds);
-      runs = (data ?? []) as typeof runs;
+    let episodes: { project_id: string; word_count: number | null }[] = [];
+    if (projIds.length > 0) {
+      const { data } = await sb.from("episodes").select("project_id, word_count").in("project_id", projIds);
+      episodes = (data ?? []) as typeof episodes;
     }
-    const wfOwnerById = new Map<string, string | null>();
-    for (const w of (workflows ?? []) as { id: string; owner_id: string | null }[]) {
-      wfOwnerById.set(w.id, w.owner_id);
-    }
-    const stats = new Map<string, { runs: number; tokens: number }>();
-    for (const r of runs) {
-      const owner = wfOwnerById.get(r.workflow_id);
+    const stats = new Map<string, { episodes: number; words: number }>();
+    for (const e of episodes) {
+      const owner = projOwnerById.get(e.project_id);
       if (!owner) continue;
-      const s = stats.get(owner) ?? { runs: 0, tokens: 0 };
-      s.runs += 1;
-      s.tokens += r.total_tokens ?? 0;
+      const s = stats.get(owner) ?? { episodes: 0, words: 0 };
+      s.episodes += 1;
+      s.words += e.word_count ?? 0;
       stats.set(owner, s);
     }
     return NextResponse.json({
       users: users.map((u) => ({
         ...u,
-        workflow_count: wfByOwner.get(u.id) ?? 0,
-        run_count: stats.get(u.id)?.runs ?? 0,
-        total_tokens: stats.get(u.id)?.tokens ?? 0,
+        project_count: projByOwner.get(u.id) ?? 0,
+        episode_count: stats.get(u.id)?.episodes ?? 0,
+        word_count: stats.get(u.id)?.words ?? 0,
       })),
     });
   } catch (e) {
