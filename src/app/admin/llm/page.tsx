@@ -363,7 +363,7 @@ export default function SettingsPage() {
             <section className="card mb-6 p-6">
               <h3 className="text-sm font-semibold text-slate-800">Chat 对话模型</h3>
               <p className="mt-1 text-xs leading-5 text-slate-400">
-                顶部导航「Chat」问答使用的模型，与工作流节点模型相互独立。不选则按上面的对话供应商优先级自动选择。
+                顶部导航「Chat」问答使用的模型，与创作模型相互独立。不选则按上面的对话供应商优先级自动选择。
               </p>
               <div className="mt-4 grid max-w-xl gap-4">
                 <Field label="供应商">
@@ -534,7 +534,7 @@ export default function SettingsPage() {
       <ConfirmDialog
         open={deleteTarget !== null}
         title="删除供应商"
-        description={`确定删除「${deleteTarget?.name || ""}」吗？相关工作流将回退到其他供应商或环境变量配置。`}
+        description={`确定删除「${deleteTarget?.name || ""}」吗？相关创作将回退到其他供应商或环境变量配置。`}
         confirmLabel="删除"
         danger
         onConfirm={() => {

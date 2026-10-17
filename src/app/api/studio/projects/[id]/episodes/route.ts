@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabase } from "@/lib/supabase";
 import { authUser, unauthorized, canAccessProject } from "@/lib/access";
+import { inngest, EVENTS } from "@/lib/inngest";
+import { createJob, failJob } from "@/lib/studio/jobs";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +26,7 @@ export async function GET(req: NextRequest, { params }: Params) {
   return NextResponse.json({ episodes: data ?? [] });
 }
 
-/** POST /api/studio/projects/[id]/episodes — 新建一集（草稿占位，number 自动取下一集） */
+/** POST /api/studio/projects/[id]/episodes — 写下一集：建草稿 + 建任务 + 触发 Inngest 流水线 */
 export async function POST(req: NextRequest, { params }: Params) {
   const me = await authUser(req);
   if (!me) return unauthorized();
@@ -47,5 +49,21 @@ export async function POST(req: NextRequest, { params }: Params) {
     .select("id, number")
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data);
+
+  // 创建写作任务并触发异步流水线
+  const job = await createJob(data.id);
+  try {
+    await inngest.send({
+      name: EVENTS.EPISODE_WRITE_REQUESTED,
+      data: { jobId: job.id, episodeId: data.id, projectId: id },
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    await failJob(job.id, `触发写作流水线失败（Inngest 未配置？）：${msg}`);
+    return NextResponse.json(
+      { ...data, jobId: job.id, warning: "Inngest 未配置，流水线无法启动。请检查 INNGEST_EVENT_KEY。" },
+      { status: 202 }
+    );
+  }
+  return NextResponse.json({ ...data, jobId: job.id });
 }
