@@ -146,6 +146,39 @@ export default function EpisodeDetail({ projectId, episodeId }: { projectId: str
     }
   };
 
+  const retryEpisode = async () => {
+    if (!confirm("确定重写本集吗？现有大纲和正文会被清空，重新开始写作。")) return;
+    setActing(true);
+    try {
+      const res = await fetch(`/api/studio/projects/${projectId}/episodes/${episodeId}/retry`, { method: "POST" });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error || "重写失败");
+      if (j.warning) toast.error(j.warning);
+      else toast.success("已重新开始写作");
+      void load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "重写失败");
+    } finally {
+      setActing(false);
+    }
+  };
+
+  const deleteEpisode = async () => {
+    if (!confirm("确定删除本集吗？此操作不可恢复。")) return;
+    setActing(true);
+    try {
+      const res = await fetch(`/api/studio/projects/${projectId}/episodes/${episodeId}`, { method: "DELETE" });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error || "删除失败");
+      toast.success("已删除");
+      window.location.href = `/studio/${projectId}`;
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "删除失败");
+    } finally {
+      setActing(false);
+    }
+  };
+
   if (loading) {
     return (
       <>
@@ -181,6 +214,9 @@ export default function EpisodeDetail({ projectId, episodeId }: { projectId: str
           desc={episode.word_count > 0 ? `共 ${episode.word_count} 字` : "写作中"}
           actions={
             <div className="flex gap-2">
+              {!jobRunning && (
+                <Button variant="secondary" size="sm" disabled={acting} onClick={retryEpisode}>重新写</Button>
+              )}
               {jobRunning && (
                 <Button variant="secondary" size="sm" disabled={acting} onClick={cancelJob}>取消任务</Button>
               )}
@@ -188,6 +224,9 @@ export default function EpisodeDetail({ projectId, episodeId }: { projectId: str
                 <Button variant="primary" size="sm" disabled={acting} onClick={publish}>发布本集</Button>
               )}
               {episode.status === "published" && <Badge tone="green">已发布</Badge>}
+              <Button variant="secondary" size="sm" disabled={acting} onClick={deleteEpisode}>
+                <span className="text-red-600">删除本集</span>
+              </Button>
             </div>
           }
         />
