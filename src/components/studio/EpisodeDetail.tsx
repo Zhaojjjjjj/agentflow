@@ -386,18 +386,18 @@ export default function EpisodeDetail({ projectId, episodeId }: { projectId: str
               </div>
             )}
             <div className="min-w-0 flex-1">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-medium text-slate-700">封面图提示词</p>
-                {episode.cover_prompt && (
-                  <button onClick={copyCoverPrompt} className="text-sm text-brand-600 hover:text-brand-700">
-                    复制
-                  </button>
-                )}
-              </div>
               {episode.cover_prompt ? (
-                <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-600">{episode.cover_prompt}</p>
+                <details>
+                  <summary className="cursor-pointer text-sm font-medium text-slate-700">封面图提示词</summary>
+                  <div className="mt-2 flex items-start justify-between gap-2">
+                    <p className="whitespace-pre-wrap text-sm leading-6 text-slate-600">{episode.cover_prompt}</p>
+                    <button onClick={copyCoverPrompt} className="shrink-0 text-sm text-brand-600 hover:text-brand-700">
+                      复制
+                    </button>
+                  </div>
+                </details>
               ) : (
-                <p className="mt-2 text-sm text-slate-400">正文完成后自动生成，可复制去外部生图，再回来上传。</p>
+                <p className="text-sm text-slate-400">正文完成后自动生成，可复制去外部生图，再回来上传。</p>
               )}
             </div>
           </div>
@@ -494,10 +494,10 @@ export default function EpisodeDetail({ projectId, episodeId }: { projectId: str
   const summaryCard = (
     <>
 {episode.summary && (
-          <div className="card mt-6 p-5">
-            <h3 className="mb-2 text-sm font-medium text-slate-700">剧情摘要（记忆用）</h3>
-            <p className="text-sm leading-7 text-slate-500">{episode.summary}</p>
-          </div>
+          <details className="card mb-6 p-5">
+            <summary className="cursor-pointer text-sm font-medium text-slate-700">剧情摘要（记忆用）</summary>
+            <p className="mt-3 text-sm leading-7 text-slate-600">{episode.summary}</p>
+          </details>
         )}
     </>
   );
