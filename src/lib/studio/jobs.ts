@@ -10,6 +10,7 @@ export type JobStage =
   | "drafting"
   | "review"
   | "memorize"
+  | "cover"
   | "done";
 
 export type JobStatus = "running" | "succeeded" | "failed" | "cancelled";
@@ -33,6 +34,7 @@ export const STAGE_LABELS: Record<string, string> = {
   drafting: "扩写正文",
   review: "一致性检查",
   memorize: "记忆入库",
+  cover: "封面提示词",
   done: "已完成",
 };
 

@@ -265,3 +265,28 @@ return JSON.parse(text.slice(start, end + 1));
 return null;
 }
 }
+
+/** 封面图提示词：根据本集摘要生成可直接投喂生图模型的中文描述 */
+export function coverPrompt(
+  title: string,
+  episodeNumber: number,
+  genre: string | null,
+  characters: { name: string; role: string | null; profile: string | null }[],
+  summary: string
+): string {
+  const cast = characters
+    .slice(0, 4)
+    .map((c) => `${c.name}${c.role ? `（${c.role}）` : ""}${c.profile ? `：${c.profile.slice(0, 60)}` : ""}`)
+    .join("；");
+  return `你是连载作品的美术指导。请为《${title}》第 ${episodeNumber} 集设计一张封面图的生成提示词。
+${genre ? `题材：${genre}。` : ""}${cast ? `主要人物：${cast}。` : ""}
+本集剧情摘要：
+${summary.slice(0, 1200)}
+
+要求：
+- 抓住本集最具视觉冲击力的一个瞬间（人物神态、关键场景、标志性道具），不要平铺直叙全集剧情
+- 中文输出，一段话，150-250 字，可直接粘贴给图像生成模型
+- 包含：主体、场景、氛围情绪、色调光影、竖版封面构图
+- 明确要求画面中不出现任何文字、字母、水印
+- 只输出提示词正文，不要标题和解释。`;
+}

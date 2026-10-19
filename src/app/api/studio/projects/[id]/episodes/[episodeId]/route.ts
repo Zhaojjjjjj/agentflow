@@ -17,7 +17,7 @@ export async function GET(req: NextRequest, { params }: Params) {
   const sb = getSupabase();
   const { data, error } = await sb
     .from("episodes")
-    .select("id, number, title, outline, content, summary, word_count, status, created_at, updated_at")
+    .select("id, number, title, outline, content, summary, word_count, status, cover_prompt, cover_url, created_at, updated_at")
     .eq("id", episodeId)
     .eq("project_id", id)
     .single();
@@ -43,7 +43,11 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     .order("number", { ascending: false })
     .limit(1)
     .single();
-  const { data: thisEp } = await sb.from("episodes").select("number").eq("id", episodeId).single();
+  const { data: thisEp } = await sb
+    .from("episodes")
+    .select("number, cover_url")
+    .eq("id", episodeId)
+    .single();
   if (!thisEp) return NextResponse.json({ error: "剧集不存在" }, { status: 404 });
   const maxNumber = (maxEp as { number: number } | null)?.number ?? 0;
   if (thisEp.number < maxNumber) {
@@ -62,6 +66,10 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   }
   // 清理该集的记忆文档，避免脏记忆污染后续检索
   await sb.from("story_documents").delete().eq("ref_id", episodeId);
+  // 同步删掉封面文件，避免 covers 桶堆积孤儿文件（与 retry/upload 的清理逻辑一致）
+  const oldCover = (thisEp as { number: number; cover_url?: string | null }).cover_url;
+  const cm = oldCover?.match(/\/covers\/(.+)$/);
+  if (cm) await sb.storage.from("covers").remove([cm[1]]);
   const { error } = await sb.from("episodes").delete().eq("id", episodeId).eq("project_id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });

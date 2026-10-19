@@ -36,10 +36,16 @@ export async function POST(req: NextRequest, { params }: Params) {
     await updateJob(oldJob.id, { status: "cancelled", progress: "已开始重写，旧任务取消" });
   }
 
-  // 重置剧集
+  // 重置剧集（含封面提示词与已上传封面）
+  const { data: oldEp } = await sb.from("episodes").select("cover_url").eq("id", episodeId).single();
+  const oldCover = (oldEp as { cover_url?: string } | null)?.cover_url;
+  if (oldCover) {
+    const m = oldCover.match(/\/covers\/(.+)$/);
+    if (m) await sb.storage.from("covers").remove([m[1]]);
+  }
   const { error: resetErr } = await sb
     .from("episodes")
-    .update({ outline: "", content: "", summary: "", word_count: 0, status: "draft" })
+    .update({ outline: "", content: "", summary: "", word_count: 0, status: "draft", cover_prompt: "", cover_url: "" })
     .eq("id", episodeId);
   if (resetErr) return NextResponse.json({ error: resetErr.message }, { status: 500 });
 

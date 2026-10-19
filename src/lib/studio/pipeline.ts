@@ -14,6 +14,7 @@ import {
   revisePrompt,
   summaryPrompt,
   memoryExtractPrompt,
+  coverPrompt,
   extractJson,
   type MemoryExtraction,
 } from "./prompts";
@@ -160,6 +161,27 @@ export function countWords(text: string): number {
   const cjk = (text.match(/[\u4e00-\u9fff\u3400-\u4dbf]/g) || []).length;
   const latin = (text.replace(/[\u4e00-\u9fff\u3400-\u4dbf]/g, " ").match(/[a-zA-Z0-9]+/g) || []).length;
   return cjk + latin;
+}
+
+/** 生成本集封面图提示词（用户手动生图用） */
+export async function generateCoverPrompt(ctx: StoryContext, summary: string): Promise<string> {
+  const res = await pipelineChat(
+    [
+      { role: "system", content: "你是连载作品的美术指导，擅长为单集设计有冲击力的封面画面。" },
+      {
+        role: "user",
+        content: coverPrompt(
+          ctx.title,
+          ctx.episodeNumber,
+          ctx.genre,
+          ctx.characters.map((c) => ({ name: c.name, role: c.role, profile: c.profile })),
+          summary
+        ),
+      },
+    ],
+    { temperature: 0.9, maxTokens: 1024 }
+  );
+  return res.text.trim();
 }
 
 /** 记忆入库：摘要 + 人物状态 + 伏笔 + 向量文档 */

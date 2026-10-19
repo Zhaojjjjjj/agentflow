@@ -17,6 +17,7 @@ import {
   checkConsistency,
   reviseContent,
   memorizeEpisode,
+  generateCoverPrompt,
 } from "@/lib/studio/pipeline";
 
 interface WriteEventData {
@@ -120,9 +121,17 @@ export const writeEpisode = inngest.createFunction(
       }
 
       // ---- 6. 记忆入库 ----
-      await step.run("memorize", async () => {
+      const { summary } = await step.run("memorize", async () => {
         await setStage(jobId, "memorize", "正在生成摘要、更新人物与伏笔…");
-        await memorizeEpisode(projectId, episodeId, ctx.episodeNumber, ctx, fullContent);
+        return await memorizeEpisode(projectId, episodeId, ctx.episodeNumber, ctx, fullContent);
+      });
+
+      // ---- 7. 封面图提示词 ----
+      await step.run("cover-prompt", async () => {
+        await setStage(jobId, "cover", "正在生成本集封面图提示词…");
+        const prompt = await generateCoverPrompt(ctx, summary);
+        const sb = getSupabase();
+        await sb.from("episodes").update({ cover_prompt: prompt }).eq("id", episodeId);
       });
 
       // ---- 完成 ----

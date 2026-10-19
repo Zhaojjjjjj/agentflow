@@ -16,6 +16,8 @@ interface Episode {
   summary: string;
   word_count: number;
   status: string;
+  cover_prompt: string;
+  cover_url: string;
 }
 
 interface Job {
@@ -27,7 +29,7 @@ interface Job {
   error: string;
 }
 
-const STAGE_ORDER = ["queued", "context", "outline", "outline_review", "drafting", "review", "memorize", "done"];
+const STAGE_ORDER = ["queued", "context", "outline", "outline_review", "drafting", "review", "memorize", "cover", "done"];
 
 export default function EpisodeDetail({ projectId, episodeId }: { projectId: string; episodeId: string }) {
   const [episode, setEpisode] = useState<Episode | null>(null);
@@ -196,6 +198,53 @@ export default function EpisodeDetail({ projectId, episodeId }: { projectId: str
     }
   };
 
+  const uploadCover = async (file: File) => {
+    setActing(true);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch(`/api/studio/projects/${projectId}/episodes/${episodeId}/cover`, {
+        method: "POST",
+        body: form,
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error || "上传失败");
+      toast.success("封面已上传");
+      void load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "上传失败");
+    } finally {
+      setActing(false);
+    }
+  };
+
+  const deleteCover = async () => {
+    const ok = await confirmDialog({ title: "移除本集封面？", confirmText: "移除", danger: true });
+    if (!ok) return;
+    setActing(true);
+    try {
+      const res = await fetch(`/api/studio/projects/${projectId}/episodes/${episodeId}/cover`, { method: "DELETE" });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error || "移除失败");
+      toast.success("封面已移除");
+      void load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "移除失败");
+    } finally {
+      setActing(false);
+    }
+  };
+
+  const copyCoverPrompt = async () => {
+    if (!episode?.cover_prompt) return;
+    try {
+      await navigator.clipboard.writeText(episode.cover_prompt);
+      toast.success("提示词已复制，去生图吧");
+    } catch {
+      toast.error("复制失败，请手动选择复制");
+    }
+  };
+
   const saveContent = async () => {
     setActing(true);
     try {
@@ -296,6 +345,57 @@ export default function EpisodeDetail({ projectId, episodeId }: { projectId: str
             )}
           </div>
         )}
+
+        {/* 封面 */}
+        <div className="card mb-6 p-5">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold text-slate-900">封面</h3>
+            <div className="flex gap-2">
+              <label className={`cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 ${acting ? "pointer-events-none opacity-50" : ""}`}>
+                {episode.cover_url ? "更换封面" : "上传封面"}
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    e.target.value = "";
+                    if (f) void uploadCover(f);
+                  }}
+                />
+              </label>
+              {episode.cover_url && (
+                <Button variant="secondary" size="sm" disabled={acting} onClick={deleteCover}>
+                  <span className="text-red-600">移除</span>
+                </Button>
+              )}
+            </div>
+          </div>
+          <div className="mt-4 flex gap-4">
+            {episode.cover_url ? (
+              <img src={episode.cover_url} alt="本集封面" className="h-40 w-28 shrink-0 rounded-xl border border-slate-200 object-cover" />
+            ) : (
+              <div className="flex h-40 w-28 shrink-0 items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 text-xs text-slate-400">
+                暂无封面
+              </div>
+            )}
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-slate-700">封面图提示词</p>
+                {episode.cover_prompt && (
+                  <button onClick={copyCoverPrompt} className="text-sm text-brand-600 hover:text-brand-700">
+                    复制
+                  </button>
+                )}
+              </div>
+              {episode.cover_prompt ? (
+                <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-600">{episode.cover_prompt}</p>
+              ) : (
+                <p className="mt-2 text-sm text-slate-400">正文完成后自动生成，可复制去外部生图，再回来上传。</p>
+              )}
+            </div>
+          </div>
+        </div>
 
         {/* 大纲审稿 */}
         {needReview && (
