@@ -5,6 +5,7 @@ import Link from "next/link";
 import TopNav from "@/components/TopNav";
 import { Button, Badge, PageHeader, Skeleton, EmptyState } from "@/components/ui";
 import { toast } from "@/components/toast";
+import { confirmDialog } from "@/components/confirm";
 
 interface Episode {
   id: string;
@@ -131,7 +132,8 @@ export default function EpisodeDetail({ projectId, episodeId }: { projectId: str
   };
 
   const cancelJob = async () => {
-    if (!confirm("确定取消这次写作任务吗？")) return;
+    const ok = await confirmDialog({ title: "取消这次写作任务？", confirmText: "取消任务" });
+    if (!ok) return;
     setActing(true);
     try {
       const res = await fetch(`/api/studio/projects/${projectId}/episodes/${episodeId}/publish`, { method: "DELETE" });
@@ -147,7 +149,13 @@ export default function EpisodeDetail({ projectId, episodeId }: { projectId: str
   };
 
   const retryEpisode = async () => {
-    if (!confirm("确定重写本集吗？现有大纲和正文会被清空，重新开始写作。")) return;
+    const ok = await confirmDialog({
+      title: "重写本集？",
+      message: "现有大纲和正文会被清空，重新开始写作。",
+      confirmText: "重写",
+      danger: true,
+    });
+    if (!ok) return;
     setActing(true);
     try {
       const res = await fetch(`/api/studio/projects/${projectId}/episodes/${episodeId}/retry`, { method: "POST" });
@@ -164,7 +172,13 @@ export default function EpisodeDetail({ projectId, episodeId }: { projectId: str
   };
 
   const deleteEpisode = async () => {
-    if (!confirm("确定删除本集吗？此操作不可恢复。")) return;
+    const ok = await confirmDialog({
+      title: "删除本集？",
+      message: "此操作不可恢复。",
+      confirmText: "删除",
+      danger: true,
+    });
+    if (!ok) return;
     setActing(true);
     try {
       const res = await fetch(`/api/studio/projects/${projectId}/episodes/${episodeId}`, { method: "DELETE" });

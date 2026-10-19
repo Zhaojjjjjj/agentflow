@@ -6,6 +6,7 @@ import Logo from "@/components/Logo";
 import { useMe } from "@/components/UserMenu";
 import { Markdown, Skeleton } from "@/components/ui";
 import { toast } from "@/components/toast";
+import { confirmDialog } from "@/components/confirm";
 
 interface Conversation {
   id: string;
@@ -370,7 +371,8 @@ export default function ChatPage() {
 
   const deleteConversation = useCallback(
     async (id: string) => {
-      if (!confirm("确定删除这个对话吗？")) return;
+      const ok = await confirmDialog({ title: "删除这个对话？", confirmText: "删除", danger: true });
+      if (!ok) return;
       try {
         const res = await fetch(`/api/chat/conversations/${id}`, { method: "DELETE" });
         const j = await res.json();

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { Toaster } from "@/components/toast";
+import { ConfirmHost } from "@/components/confirm";
 
 export const metadata: Metadata = {
   title: "AgentFlow · AI 连载创作平台",
@@ -13,6 +14,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="bg-white text-slate-900 antialiased">
         {children}
         <Toaster />
+        <ConfirmHost />
       </body>
     </html>
   );

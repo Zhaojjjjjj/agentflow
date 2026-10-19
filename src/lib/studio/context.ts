@@ -15,9 +15,9 @@ interface ProjectRow {
   title: string;
   kind: string;
   genre: string | null;
-  synopsis: string | null;
+  premise: string | null;
   worldview: string | null;
-  style: string | null;
+  style_notes: string | null;
   episode_target_words: number;
 }
 
@@ -26,10 +26,11 @@ export async function gatherContext(projectId: string, episodeNumber: number): P
 
   const { data: project, error: pErr } = await sb
     .from("story_projects")
-    .select("id, title, kind, genre, synopsis, worldview, style, episode_target_words")
+    .select("id, title, kind, genre, premise, worldview, style_notes, episode_target_words")
     .eq("id", projectId)
     .single();
-  if (pErr || !project) throw new Error("作品不存在");
+  if (pErr) throw new Error(`读取作品失败：${pErr.message}`);
+  if (!project) throw new Error("作品不存在");
   const p = project as ProjectRow;
 
   const [{ data: episodes }, { data: characters }, { data: threads }] = await Promise.all([
@@ -60,16 +61,16 @@ export async function gatherContext(projectId: string, episodeNumber: number): P
 
   const relatedMemories = await recallMemories(
     projectId,
-    [p.synopsis, ...recentSummaries.map((s) => s.summary)].filter(Boolean).join("\n").slice(0, 2000)
+    [p.premise, ...recentSummaries.map((s) => s.summary)].filter(Boolean).join("\n").slice(0, 2000)
   );
 
   return {
     title: p.title,
     kind: p.kind === "drama" ? "drama" : "novel",
     genre: p.genre,
-    synopsis: p.synopsis,
+    synopsis: p.premise,
     worldview: p.worldview,
-    style: p.style,
+    style: p.style_notes,
     episodeNumber,
     targetWords: p.episode_target_words || 2000,
     recentSummaries,
