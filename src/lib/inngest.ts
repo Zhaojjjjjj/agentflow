@@ -11,4 +11,5 @@ export const EVENTS = {
   // Studio 连载流水线
   EPISODE_WRITE_REQUESTED: "studio/episode.write.requested",
   OUTLINE_APPROVED: "studio/episode.outline.approved",
+  COVER_GENERATE_REQUESTED: "studio/cover.generate.requested",
 } as const;
