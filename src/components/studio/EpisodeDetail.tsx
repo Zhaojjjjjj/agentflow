@@ -31,6 +31,33 @@ interface Job {
 
 const STAGE_ORDER = ["queued", "context", "outline", "outline_review", "drafting", "review", "memorize", "cover", "done"];
 
+/** 写作中的加载动画：实时阶段文案 + 打字机光标 + 墨水书写骨架线 */
+function WritingLoader({ progress, stageLabel }: { progress?: string; stageLabel?: string }) {
+  const lines = [100, 96, 98, 90, 94, 62];
+  return (
+    <div className="py-14">
+      <p className="text-center text-sm font-medium text-slate-800">
+        {progress || "AI 正在写作"}
+        <span
+          className="ml-1 inline-block h-[14px] w-[2px] bg-brand-600 align-[-2px]"
+          style={{ animation: "cursor-blink 1.1s step-end infinite" }}
+        />
+      </p>
+      {stageLabel && <p className="mt-1.5 text-center text-xs text-slate-400">{stageLabel}</p>}
+      <div className="mx-auto mt-10 max-w-lg space-y-3.5 px-2">
+        {lines.map((w, i) => (
+          <div key={i} className="h-2.5 overflow-hidden rounded-full bg-slate-100" style={{ width: `${w}%` }}>
+            <div
+              className="h-full w-full origin-left rounded-full bg-slate-300/80"
+              style={{ animation: `ink-fill 2.4s ease-in-out ${i * 0.32}s infinite` }}
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function EpisodeDetail({ projectId, episodeId }: { projectId: string; episodeId: string }) {
   const [episode, setEpisode] = useState<Episode | null>(null);
   const [job, setJob] = useState<Job | null>(null);
@@ -288,36 +315,11 @@ export default function EpisodeDetail({ projectId, episodeId }: { projectId: str
   const needReview = jobRunning && job.stage === "outline_review";
   const stageIdx = STAGE_ORDER.indexOf(job?.stage ?? "");
 
-  return (
-    <>
-      <TopNav />
-      <main className="mx-auto max-w-4xl px-6 py-8">
-        <div className="mb-2">
-          <Link href={`/studio/${projectId}`} className="text-sm text-slate-400 hover:text-slate-600">← 返回作品</Link>
-        </div>
-        <PageHeader
-          title={episode.title || `第 ${episode.number} 集`}
-          desc={episode.word_count > 0 ? `共 ${episode.word_count} 字` : "写作中"}
-          actions={
-            <div className="flex gap-2">
-              {!jobRunning && (
-                <Button variant="secondary" size="sm" disabled={acting} onClick={retryEpisode}>重新写</Button>
-              )}
-              {jobRunning && (
-                <Button variant="secondary" size="sm" disabled={acting} onClick={cancelJob}>取消任务</Button>
-              )}
-              {job?.status === "succeeded" && episode.status !== "published" && episode.content && (
-                <Button variant="primary" size="sm" disabled={acting} onClick={publish}>发布本集</Button>
-              )}
-              {episode.status === "published" && <Badge tone="green">已发布</Badge>}
-              <Button variant="secondary" size="sm" disabled={acting} onClick={deleteEpisode}>
-                <span className="text-red-600">删除本集</span>
-              </Button>
-            </div>
-          }
-        />
+  const hasContent = !!episode.content;
 
-        {/* 写作进度 */}
+  const progressCard = (
+    <>
+{/* 写作进度 */}
         {job && (
           <div className="card mb-6 p-5">
             <div className="flex items-center justify-between">
@@ -345,8 +347,12 @@ export default function EpisodeDetail({ projectId, episodeId }: { projectId: str
             )}
           </div>
         )}
+    </>
+  );
 
-        {/* 封面 */}
+  const coverCard = (
+    <>
+{/* 封面 */}
         <div className="card mb-6 p-5">
           <div className="flex items-center justify-between">
             <h3 className="font-semibold text-slate-900">封面</h3>
@@ -396,8 +402,12 @@ export default function EpisodeDetail({ projectId, episodeId }: { projectId: str
             </div>
           </div>
         </div>
+    </>
+  );
 
-        {/* 大纲审稿 */}
+  const outlineSection = (
+    <>
+{/* 大纲审稿 */}
         {needReview && (
           <div className="card mb-6 border-brand-200 p-5">
             <div className="flex items-center justify-between">
@@ -440,8 +450,12 @@ export default function EpisodeDetail({ projectId, episodeId }: { projectId: str
             </div>
           </details>
         )}
+    </>
+  );
 
-        {/* 正文 */}
+  const contentCard = (
+    <>
+{/* 正文 */}
         <div className="card p-6 md:p-8">
           <div className="mb-4 flex items-center justify-between">
             <h3 className="font-semibold text-slate-900">正文</h3>
@@ -468,18 +482,73 @@ export default function EpisodeDetail({ projectId, episodeId }: { projectId: str
             </>
           ) : episode.content ? (
             <Markdown text={episode.content} />
+          ) : jobRunning ? (
+            <WritingLoader progress={job?.progress} stageLabel={job?.stageLabel} />
           ) : (
-            <p className="text-sm text-slate-400">
-              {jobRunning ? "正文还在写，稍后再来。" : "还没有正文。"}
-            </p>
+            <p className="text-sm text-slate-400">还没有正文。</p>
           )}
         </div>
+    </>
+  );
 
-        {episode.summary && (
+  const summaryCard = (
+    <>
+{episode.summary && (
           <div className="card mt-6 p-5">
             <h3 className="mb-2 text-sm font-medium text-slate-700">剧情摘要（记忆用）</h3>
             <p className="text-sm leading-7 text-slate-500">{episode.summary}</p>
           </div>
+        )}
+    </>
+  );
+
+  return (
+    <>
+      <TopNav />
+      <main className={`mx-auto px-6 py-8 ${hasContent ? "max-w-6xl" : "max-w-4xl"}`}>
+        <div className="mb-2">
+          <Link href={`/studio/${projectId}`} className="text-sm text-slate-400 hover:text-slate-600">← 返回作品</Link>
+        </div>
+        <PageHeader
+          title={episode.title || `第 ${episode.number} 集`}
+          desc={episode.word_count > 0 ? `共 ${episode.word_count} 字` : "写作中"}
+          actions={
+            <div className="flex gap-2">
+              {!jobRunning && (
+                <Button variant="secondary" size="sm" disabled={acting} onClick={retryEpisode}>重新写</Button>
+              )}
+              {jobRunning && (
+                <Button variant="secondary" size="sm" disabled={acting} onClick={cancelJob}>取消任务</Button>
+              )}
+              {job?.status === "succeeded" && episode.status !== "published" && episode.content && (
+                <Button variant="primary" size="sm" disabled={acting} onClick={publish}>发布本集</Button>
+              )}
+              {episode.status === "published" && <Badge tone="green">已发布</Badge>}
+              <Button variant="secondary" size="sm" disabled={acting} onClick={deleteEpisode}>
+                <span className="text-red-600">删除本集</span>
+              </Button>
+            </div>
+          }
+        />
+
+        {hasContent ? (
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+            <div className="min-w-0">{contentCard}</div>
+            <aside className="min-w-0">
+              {progressCard}
+              {coverCard}
+              {outlineSection}
+              {summaryCard}
+            </aside>
+          </div>
+        ) : (
+          <>
+            {progressCard}
+            {coverCard}
+            {outlineSection}
+            {contentCard}
+            {summaryCard}
+          </>
         )}
       </main>
     </>
