@@ -18,12 +18,16 @@ export async function POST(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "作品不存在或无权访问" }, { status: 404 });
   }
   const sb = getSupabase();
-  const { data: ep } = await sb
+  const { data: ep, error: epErr } = await sb
     .from("episodes")
     .select("id, number")
     .eq("id", episodeId)
     .eq("project_id", id)
     .single();
+  // PGRST116 = 查无此行（真正的 404）；其他错误（列名/权限/网络）必须报真实原因，
+  // 不能再伪装成"剧集不存在"（同 context.ts 列名 bug 的教训）。
+  if (epErr && epErr.code !== "PGRST116")
+    return NextResponse.json({ error: `读取剧集失败：${epErr.message}` }, { status: 500 });
   if (!ep) return NextResponse.json({ error: "剧集不存在" }, { status: 404 });
 
   // 取消旧任务

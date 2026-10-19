@@ -155,7 +155,7 @@ export async function extractMemory(ctx: StoryContext, content: string): Promise
   };
 }
 
-function countWords(text: string): number {
+export function countWords(text: string): number {
   // 中文按字符计，英文按词计，取一个近似值
   const cjk = (text.match(/[\u4e00-\u9fff\u3400-\u4dbf]/g) || []).length;
   const latin = (text.replace(/[\u4e00-\u9fff\u3400-\u4dbf]/g, " ").match(/[a-zA-Z0-9]+/g) || []).length;

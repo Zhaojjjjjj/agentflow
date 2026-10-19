@@ -36,6 +36,8 @@ export default function EpisodeDetail({ projectId, episodeId }: { projectId: str
   const [editing, setEditing] = useState(false);
   const [outlineDraft, setOutlineDraft] = useState("");
   const [acting, setActing] = useState(false);
+  const [editingContent, setEditingContent] = useState(false);
+  const [contentDraft, setContentDraft] = useState("");
 
   const load = useCallback(async () => {
     const [er, jr] = await Promise.all([
@@ -46,13 +48,14 @@ export default function EpisodeDetail({ projectId, episodeId }: { projectId: str
       const j = await er.json();
       setEpisode(j.episode);
       setOutlineDraft((prev) => (editing ? prev : j.episode.outline || ""));
+      setContentDraft((prev) => (editingContent ? prev : j.episode.content || ""));
     }
     if (jr.ok) {
       const j = await jr.json();
       setJob(j.job);
     }
     setLoading(false);
-  }, [projectId, episodeId, editing]);
+  }, [projectId, episodeId, editing, editingContent]);
 
   useEffect(() => {
     void load();
@@ -193,6 +196,26 @@ export default function EpisodeDetail({ projectId, episodeId }: { projectId: str
     }
   };
 
+  const saveContent = async () => {
+    setActing(true);
+    try {
+      const res = await fetch(`/api/studio/projects/${projectId}/episodes/${episodeId}/content`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: contentDraft }),
+      });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error || "保存失败");
+      toast.success("正文已保存，摘要已同步更新");
+      setEditingContent(false);
+      void load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "保存失败");
+    } finally {
+      setActing(false);
+    }
+  };
+
   if (loading) {
     return (
       <>
@@ -318,8 +341,30 @@ export default function EpisodeDetail({ projectId, episodeId }: { projectId: str
 
         {/* 正文 */}
         <div className="card p-6 md:p-8">
-          <h3 className="mb-4 font-semibold text-slate-900">正文</h3>
-          {episode.content ? (
+          <div className="mb-4 flex items-center justify-between">
+            <h3 className="font-semibold text-slate-900">正文</h3>
+            {episode.content && !jobRunning && !editingContent && (
+              <Button variant="secondary" size="sm" onClick={() => setEditingContent(true)}>编辑正文</Button>
+            )}
+            {editingContent && (
+              <div className="flex gap-2">
+                <Button variant="secondary" size="sm" disabled={acting} onClick={() => { setEditingContent(false); setContentDraft(episode.content || ""); }}>取消</Button>
+                <Button variant="primary" size="sm" disabled={acting} onClick={saveContent}>
+                  {acting ? "保存中…" : "保存"}
+                </Button>
+              </div>
+            )}
+          </div>
+          {editingContent ? (
+            <>
+              <textarea
+                className="min-h-[480px] w-full rounded-xl border border-slate-200 p-4 text-[15px] leading-8 text-slate-800 focus:border-brand-400 focus:outline-none"
+                value={contentDraft}
+                onChange={(e) => setContentDraft(e.target.value)}
+              />
+              <p className="mt-2 text-xs text-slate-400">保存后会自动更新字数，并同步刷新本集的剧情摘要（供下一集前情检索用）。</p>
+            </>
+          ) : episode.content ? (
             <article className="prose-studio whitespace-pre-wrap text-[15px] leading-8 text-slate-800">
               {episode.content}
             </article>
