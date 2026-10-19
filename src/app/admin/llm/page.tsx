@@ -71,6 +71,42 @@ export default function SettingsPage() {
   const [chatSaving, setChatSaving] = useState(false);
   const [suggRefreshing, setSuggRefreshing] = useState(false);
 
+  // ---- 封面生图配置 ----
+  const [imgCfg, setImgCfg] = useState({ base_url: "", api_key: "", model: "" });
+  const [imgCfgLoaded, setImgCfgLoaded] = useState(false);
+  const [imgSaving, setImgSaving] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/admin/image-gen")
+      .then((r) => r.json())
+      .then((j) => {
+        if (!j.error) setImgCfg({ base_url: j.base_url || "", api_key: j.api_key || "", model: j.model || "" });
+      })
+      .catch(() => {})
+      .finally(() => setImgCfgLoaded(true));
+  }, []);
+
+  const saveImgCfg = async () => {
+    setImgSaving(true);
+    try {
+      const res = await fetch("/api/admin/image-gen", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(imgCfg),
+      });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error || "保存失败");
+      toast.success("生图配置已保存");
+      setImgCfg((c) => ({ ...c, api_key: "" })); // key 已入库，前端清空掩码
+      const rj = await fetch("/api/admin/image-gen").then((r) => r.json());
+      if (!rj.error) setImgCfg({ base_url: rj.base_url || "", api_key: rj.api_key || "", model: rj.model || "" });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "保存失败");
+    } finally {
+      setImgSaving(false);
+    }
+  };
+
   useEffect(() => {
     fetch("/api/admin/settings")
       .then((r) => r.json())
@@ -425,6 +461,42 @@ export default function SettingsPage() {
                 <p className="text-xs leading-5 text-slate-400">
                   题目池每天凌晨 3 点由 AI 自动换一批（会参考近 7 天大家的提问话题），也可手动立即刷新。
                 </p>
+              </div>
+            </section>
+            {/* 封面生图配置 */}
+            <section className="card mb-6 p-6">
+              <h3 className="text-sm font-semibold text-slate-800">封面生图配置</h3>
+              <p className="mt-1 text-xs leading-5 text-slate-400">
+                生图服务的 Base URL、Key 与默认模型。优先级高于同名环境变量，留空则用环境变量。
+              </p>
+              <div className="mt-4 grid max-w-xl gap-4">
+                <Field label="Base URL（OpenAI 兼容）">
+                  <Input
+                    value={imgCfg.base_url}
+                    onChange={(e) => setImgCfg((c) => ({ ...c, base_url: e.target.value }))}
+                    placeholder="例如 https://www.jiji.cc/v1"
+                  />
+                </Field>
+                <Field label="API Key（已保存的显示为掩码，留空不修改）">
+                  <Input
+                    type="password"
+                    value={imgCfg.api_key}
+                    onChange={(e) => setImgCfg((c) => ({ ...c, api_key: e.target.value }))}
+                    placeholder="sk-…"
+                  />
+                </Field>
+                <Field label="默认模型">
+                  <Input
+                    value={imgCfg.model}
+                    onChange={(e) => setImgCfg((c) => ({ ...c, model: e.target.value }))}
+                    placeholder="例如 gpt-image-2"
+                  />
+                </Field>
+                <div>
+                  <Button variant="primary" disabled={imgSaving || !imgCfgLoaded} onClick={saveImgCfg}>
+                    {imgSaving ? "保存中…" : "保存生图配置"}
+                  </Button>
+                </div>
               </div>
             </section>
             {renderGroup("chat", "对话供应商", "按优先级从上到下依次试错，全部失败才报错")}

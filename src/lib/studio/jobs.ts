@@ -70,17 +70,6 @@ export async function failJob(jobId: string, error: string): Promise<void> {
   await updateJob(jobId, { status: "failed", error: error.slice(0, 1000), progress: "任务失败" });
 }
 
-/** 按 id 取单个任务（封面生图轮询用，避免与写流水线的 latestJob 混淆）。 */
-export async function getJob(jobId: string): Promise<EpisodeJob | null> {
-  const sb = getSupabase();
-  const { data } = await sb
-    .from("episode_jobs")
-    .select("id, episode_id, stage, status, progress, error, created_at, finished_at")
-    .eq("id", jobId)
-    .single();
-  return (data as EpisodeJob | null) ?? null;
-}
-
 export async function latestJob(episodeId: string): Promise<EpisodeJob | null> {
   const sb = getSupabase();
   const { data } = await sb

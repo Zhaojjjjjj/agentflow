@@ -65,8 +65,6 @@ export default function EpisodeDetail({ projectId, episodeId }: { projectId: str
   const [editing, setEditing] = useState(false);
   const [outlineDraft, setOutlineDraft] = useState("");
   const [acting, setActing] = useState(false);
-  const [generating, setGenerating] = useState(false);
-  const [genProgress, setGenProgress] = useState("");
   const [editingContent, setEditingContent] = useState(false);
   const [contentDraft, setContentDraft] = useState("");
 
@@ -274,45 +272,6 @@ export default function EpisodeDetail({ projectId, episodeId }: { projectId: str
     }
   };
 
-  /** 一键 AI 生成封面：发任务 → 轮询 → 完成后刷新 */
-  const generateCoverAi = async () => {
-    if (generating) return;
-    setGenerating(true);
-    setGenProgress("正在提交生图任务…");
-    try {
-      const res = await fetch(
-        `/api/studio/projects/${projectId}/episodes/${episodeId}/cover/generate`,
-        { method: "POST" }
-      );
-      const j = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(j.error || "提交失败");
-      const jobId = j.jobId as string;
-      for (let i = 0; i < 40; i++) {
-        await new Promise((r) => setTimeout(r, 3000));
-        const pr = await fetch(
-          `/api/studio/projects/${projectId}/episodes/${episodeId}/cover/generate?jobId=${jobId}`
-        );
-        const pj = await pr.json().catch(() => ({}));
-        const job = pj.job as { status: string; progress: string; error: string } | undefined;
-        if (!job) throw new Error("任务状态获取失败");
-        setGenProgress(job.progress || "正在绘制封面…");
-        if (job.status === "succeeded") {
-          toast.success("封面已生成");
-          await load();
-          break;
-        }
-        if (job.status === "failed" || job.status === "cancelled") {
-          throw new Error(job.error || "封面生成失败");
-        }
-      }
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "封面生成失败");
-    } finally {
-      setGenerating(false);
-      setGenProgress("");
-    }
-  };
-
   const saveContent = async () => {
     setActing(true);
     try {
@@ -398,14 +357,6 @@ export default function EpisodeDetail({ projectId, episodeId }: { projectId: str
           <div className="flex items-center justify-between">
             <h3 className="font-semibold text-slate-900">封面</h3>
             <div className="flex gap-2">
-              <Button
-                variant="primary"
-                size="sm"
-                disabled={acting || generating || jobRunning}
-                onClick={generateCoverAi}
-              >
-                {generating ? "生成中…" : episode.cover_url ? "重新生成" : "AI 生成封面"}
-              </Button>
               <label className={`cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 ${acting ? "pointer-events-none opacity-50" : ""}`}>
                 {episode.cover_url ? "更换封面" : "上传封面"}
                 <input
@@ -426,15 +377,6 @@ export default function EpisodeDetail({ projectId, episodeId }: { projectId: str
               )}
             </div>
           </div>
-          {generating && (
-            <div className="mt-3 flex items-center gap-2 rounded-xl bg-brand-50 px-4 py-3">
-              <span
-                className="inline-block h-2 w-2 rounded-full bg-brand-600"
-                style={{ animation: "cursor-blink 1.1s step-end infinite" }}
-              />
-              <p className="text-sm text-slate-700">{genProgress || "正在绘制封面…"}</p>
-            </div>
-          )}
           <div className="mt-4">
             {episode.cover_url ? (
               <img src={episode.cover_url} alt="本集封面" className="h-40 w-28 rounded-xl border border-slate-200 object-cover" />
