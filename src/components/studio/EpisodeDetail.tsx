@@ -377,15 +377,15 @@ export default function EpisodeDetail({ projectId, episodeId }: { projectId: str
               )}
             </div>
           </div>
-          <div className="mt-4 flex gap-4">
+          <div className="mt-4">
             {episode.cover_url ? (
-              <img src={episode.cover_url} alt="本集封面" className="h-40 w-28 shrink-0 rounded-xl border border-slate-200 object-cover" />
+              <img src={episode.cover_url} alt="本集封面" className="h-40 w-28 rounded-xl border border-slate-200 object-cover" />
             ) : (
-              <div className="flex h-40 w-28 shrink-0 items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 text-xs text-slate-400">
+              <div className="flex h-40 w-28 items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 text-xs text-slate-400">
                 暂无封面
               </div>
             )}
-            <div className="min-w-0 flex-1">
+            <div className="mt-3">
               {episode.cover_prompt ? (
                 <details>
                   <summary className="cursor-pointer text-sm font-medium text-slate-700">封面图提示词</summary>
