@@ -126,12 +126,17 @@ export const writeEpisode = inngest.createFunction(
         return await memorizeEpisode(projectId, episodeId, ctx.episodeNumber, ctx, fullContent);
       });
 
-      // ---- 7. 封面图提示词 ----
+      // ---- 7. 封面图提示词（附加步骤：失败不影响主流程） ----
       await step.run("cover-prompt", async () => {
         await setStage(jobId, "cover", "正在生成本集封面图提示词…");
-        const prompt = await generateCoverPrompt(ctx, summary);
-        const sb = getSupabase();
-        await sb.from("episodes").update({ cover_prompt: prompt }).eq("id", episodeId);
+        try {
+          const prompt = await generateCoverPrompt(ctx, summary);
+          const sb = getSupabase();
+          await sb.from("episodes").update({ cover_prompt: prompt }).eq("id", episodeId);
+        } catch (e) {
+          // 列不存在（007 未执行）等情况只记日志，不让任务失败
+          console.warn("[studio] cover prompt skipped:", e instanceof Error ? e.message : e);
+        }
       });
 
       // ---- 完成 ----

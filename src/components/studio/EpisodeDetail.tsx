@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import TopNav from "@/components/TopNav";
-import { Button, Badge, PageHeader, Skeleton, EmptyState } from "@/components/ui";
+import { Button, Badge, PageHeader, Skeleton, EmptyState, Markdown } from "@/components/ui";
 import { toast } from "@/components/toast";
 import { confirmDialog } from "@/components/confirm";
 
@@ -424,9 +424,9 @@ export default function EpisodeDetail({ projectId, episodeId }: { projectId: str
                 onChange={(e) => setOutlineDraft(e.target.value)}
               />
             ) : (
-              <pre className="mt-4 whitespace-pre-wrap rounded-xl bg-slate-50 p-4 text-sm leading-7 text-slate-700">
-                {episode.outline || "大纲生成中…"}
-              </pre>
+              <div className="mt-4 rounded-xl bg-slate-50 p-4">
+                <Markdown text={episode.outline || "大纲生成中…"} />
+              </div>
             )}
           </div>
         )}
@@ -435,7 +435,9 @@ export default function EpisodeDetail({ projectId, episodeId }: { projectId: str
         {!needReview && episode.outline && (
           <details className="card mb-6 p-5">
             <summary className="cursor-pointer text-sm font-medium text-slate-700">本集大纲</summary>
-            <pre className="mt-3 whitespace-pre-wrap text-sm leading-7 text-slate-600">{episode.outline}</pre>
+            <div className="mt-3">
+              <Markdown text={episode.outline} />
+            </div>
           </details>
         )}
 
@@ -465,9 +467,7 @@ export default function EpisodeDetail({ projectId, episodeId }: { projectId: str
               <p className="mt-2 text-xs text-slate-400">保存后会自动更新字数，并同步刷新本集的剧情摘要（供下一集前情检索用）。</p>
             </>
           ) : episode.content ? (
-            <article className="prose-studio whitespace-pre-wrap text-[15px] leading-8 text-slate-800">
-              {episode.content}
-            </article>
+            <Markdown text={episode.content} />
           ) : (
             <p className="text-sm text-slate-400">
               {jobRunning ? "正文还在写，稍后再来。" : "还没有正文。"}
