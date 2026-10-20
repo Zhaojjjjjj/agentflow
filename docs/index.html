@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AgentFlow · AI 连载创作平台</title>
+<meta name="description" content="小说与网剧剧本的连载工作室：定下世界观，AI 帮你一集一集写下去——每一集剧情完整，每一集都记得之前发生过什么。">
+<style>
+  :root{
+    --brand:#7C3AED; --brand-dark:#6D28D9; --brand-50:#FAF5FF; --brand-100:#F3E8FF;
+    --ink:#0f172a; --body:#475569; --mute:#94a3b8; --line:#e2e8f0;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Segoe UI",sans-serif;color:var(--ink);background:#fff;-webkit-font-smoothing:antialiased}
+  a{color:inherit;text-decoration:none}
+  .wrap{max-width:1120px;margin:0 auto;padding:0 24px}
+
+  /* 顶栏 */
+  header{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.85);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+  .nav{display:flex;align-items:center;gap:10px;height:60px}
+  .nav .brand{font-size:16px;font-weight:700;letter-spacing:-.01em}
+  .nav .sp{flex:1}
+  .nav a.link{font-size:14px;color:var(--body);padding:6px 10px;border-radius:8px}
+  .nav a.link:hover{color:var(--ink);background:#f8fafc}
+  .btn{display:inline-flex;align-items:center;gap:6px;border-radius:10px;font-size:14px;font-weight:500;padding:9px 16px;transition:background .15s,border-color .15s}
+  .btn-primary{background:var(--brand);color:#fff}
+  .btn-primary:hover{background:var(--brand-dark)}
+  .btn-ghost{border:1px solid var(--line);color:var(--ink);background:#fff}
+  .btn-ghost:hover{background:#f8fafc}
+
+  /* Hero */
+  .hero{padding:72px 0 56px;display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:center}
+  .hero h1{font-size:44px;line-height:1.2;font-weight:800;letter-spacing:-.02em}
+  .hero h1 .hl{color:var(--brand)}
+  .hero p.sub{margin-top:18px;font-size:17px;line-height:1.75;color:var(--body)}
+  .hero .cta{margin-top:28px;display:flex;gap:12px;flex-wrap:wrap}
+  .hero .meta{margin-top:22px;font-size:13px;color:var(--mute)}
+
+  /* 演示面板 */
+  .stage{border:1px solid var(--line);border-radius:16px;box-shadow:0 12px 32px rgba(15,23,42,.06);overflow:hidden;background:#fff}
+  .stage-head{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--line);background:#fcfcfd}
+  .stage-head .t{font-size:13px;font-weight:600}
+  .stage-head .ep{margin-left:auto;font-size:12px;color:var(--brand);background:var(--brand-50);border:1px solid var(--brand-100);padding:2px 8px;border-radius:999px;font-weight:600}
+  .stage-body{padding:16px;min-height:308px}
+  .step{display:flex;gap:10px;padding:7px 0;font-size:13.5px;color:var(--body);opacity:0;transform:translateY(4px);transition:opacity .35s,transform .35s}
+  .step.on{opacity:1;transform:none}
+  .step .dot{flex:none;width:18px;height:18px;border-radius:50%;border:2px solid var(--line);margin-top:1px;position:relative}
+  .step.doing .dot{border-color:var(--brand);border-top-color:transparent;animation:spin .7s linear infinite}
+  .step.done .dot{border-color:var(--brand);background:var(--brand)}
+  .step.done .dot::after{content:"";position:absolute;left:4.5px;top:2px;width:4px;height:8px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(42deg)}
+  .step .lbl{font-weight:600;color:var(--ink)}
+  .step .det{color:var(--mute);font-size:12.5px;margin-left:6px}
+  .step .ok{margin-left:auto;font-size:12px;color:#16a34a;font-weight:600}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .bar{height:6px;border-radius:99px;background:#f1f5f9;overflow:hidden;margin:10px 0 4px 28px}
+  .bar i{display:block;height:100%;width:0;background:var(--brand);border-radius:99px;transition:width .3s}
+  .draft{margin:6px 0 2px 28px;border-left:2px solid var(--brand-100);padding-left:12px}
+  .draft p{font-size:13px;line-height:1.9;color:#334155;opacity:0;transform:translateY(3px);transition:opacity .4s,transform .4s}
+  .draft p.on{opacity:1;transform:none}
+  .chiprow{margin:10px 0 0 28px;display:flex;gap:6px;flex-wrap:wrap}
+  .chip{font-size:11.5px;color:var(--brand-dark);background:var(--brand-50);border:1px solid var(--brand-100);border-radius:999px;padding:2px 9px;opacity:0;transition:opacity .4s}
+  .chip.on{opacity:1}
+
+  /* 特性 */
+  section{padding:56px 0}
+  h2.sec{font-size:28px;font-weight:800;letter-spacing:-.01em;text-align:center}
+  p.secsub{text-align:center;color:var(--body);margin-top:10px;font-size:15px}
+  .grid{margin-top:36px;display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  .card{border:1px solid var(--line);border-radius:14px;padding:22px;transition:box-shadow .2s,transform .2s}
+  .card:hover{box-shadow:0 10px 28px rgba(15,23,42,.07);transform:translateY(-2px)}
+  .card .ic{width:38px;height:38px;border-radius:10px;background:var(--brand-50);display:flex;align-items:center;justify-content:center}
+  .card h3{margin-top:14px;font-size:16px;font-weight:700}
+  .card p{margin-top:7px;font-size:13.5px;line-height:1.75;color:var(--body)}
+
+  /* 四步 */
+  .steps{margin-top:36px;display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+  .stepbox{border:1px solid var(--line);border-radius:14px;padding:20px}
+  .stepbox .n{font-size:13px;font-weight:800;color:var(--brand);letter-spacing:.08em}
+  .stepbox h3{margin-top:8px;font-size:15.5px;font-weight:700}
+  .stepbox p{margin-top:6px;font-size:13px;line-height:1.7;color:var(--body)}
+
+  /* 发布条 */
+  .publish{border:1px solid var(--line);border-radius:16px;padding:30px;display:grid;grid-template-columns:1fr 1fr;gap:26px;background:#fff}
+  .publish h3{font-size:19px;font-weight:800}
+  .publish p{margin-top:8px;font-size:14px;line-height:1.8;color:var(--body)}
+  .publish ul{list-style:none}
+  .publish li{font-size:14px;color:var(--body);padding:7px 0;border-bottom:1px dashed var(--line);display:flex;gap:8px;align-items:baseline}
+  .publish li:last-child{border-bottom:none}
+  .publish li b{color:var(--ink)}
+  .tag{flex:none;font-size:11px;font-weight:700;color:var(--brand);background:var(--brand-50);border:1px solid var(--brand-100);border-radius:6px;padding:1px 6px}
+
+  /* CTA / 页脚 */
+  .cta-band{text-align:center;padding:64px 0 8px}
+  .cta-band h2{font-size:30px;font-weight:800}
+  .cta-band p{color:var(--body);margin-top:10px}
+  .cta-band .row{margin-top:24px;display:flex;gap:12px;justify-content:center}
+  footer{border-top:1px solid var(--line);margin-top:56px;padding:26px 0;color:var(--mute);font-size:13px}
+  footer .wrap{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+  footer .sp{flex:1}
+
+  @media (max-width:900px){
+    .hero{grid-template-columns:1fr;padding-top:44px}
+    .hero h1{font-size:33px}
+    .grid{grid-template-columns:1fr}
+    .steps{grid-template-columns:1fr 1fr}
+    .publish{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap nav">
+    <svg width="26" height="26" viewBox="0 0 100 100" aria-hidden="true"><g fill="none" stroke="#7C3AED" stroke-width="11"><path d="M 84.6 67.5 A 40 40 0 1 1 84.6 32.5" stroke-linecap="round"/></g><circle cx="88" cy="50" r="8" fill="#7C3AED"/><circle cx="50" cy="50" r="9" fill="#7C3AED"/></svg>
+    <span class="brand">AgentFlow</span>
+    <span class="sp"></span>
+    <a class="link" href="#features">特性</a>
+    <a class="link" href="#how">怎么写一集</a>
+    <a class="link" href="#publish">导出与发布</a>
+    <a class="link" href="https://github.com/Zhaojjjjjj/agentflow">GitHub</a>
+    <a class="btn btn-primary" href="https://af.0326.cc.cd">进入工作室</a>
+  </div>
+</header>
+
+<div class="wrap">
+  <!-- Hero -->
+  <div class="hero">
+    <div>
+      <h1>好故事，<br>一集一集<span class="hl">写下去</span></h1>
+      <p class="sub">小说与网剧剧本的连载工作室。定下世界观，AI 帮你连续创作——每一集剧情完整，每一集都记得之前发生过什么。</p>
+      <div class="cta">
+        <a class="btn btn-primary" href="https://af.0326.cc.cd">开始你的第一部连载</a>
+        <a class="btn btn-ghost" href="https://github.com/Zhaojjjjjj/agentflow">查看源码</a>
+      </div>
+      <p class="meta">长篇小说 · 网剧剧本 两种形态 · 前情记忆自动维护</p>
+    </div>
+
+    <!-- 实时演示：一集的诞生 -->
+    <div class="stage" aria-label="写作流水线演示">
+      <div class="stage-head">
+        <svg width="17" height="17" viewBox="0 0 100 100" aria-hidden="true"><g fill="none" stroke="#7C3AED" stroke-width="11"><path d="M 84.6 67.5 A 40 40 0 1 1 84.6 32.5" stroke-linecap="round"/></g><circle cx="88" cy="50" r="8" fill="#7C3AED"/><circle cx="50" cy="50" r="9" fill="#7C3AED"/></svg>
+        <span class="t">《雾港夜行》</span>
+        <span class="ep" id="epLabel">第 13 集</span>
+      </div>
+      <div class="stage-body" id="stageBody">
+        <div class="step" data-step><span class="dot"></span><span><span class="lbl">检索前情</span><span class="det">近 5 集摘要 · 全部人物 · 未回收伏笔</span></span><span class="ok"></span></div>
+        <div class="step" data-step><span class="dot"></span><span><span class="lbl">生成大纲</span><span class="det">起承转合，剧情在本集内闭环</span></span><span class="ok"></span></div>
+        <div class="step" data-step><span class="dot"></span><span><span class="lbl">人工审稿</span><span class="det">可直接改大纲，确认后才动笔</span></span><span class="ok"></span></div>
+        <div class="step" data-step><span class="dot"></span><span><span class="lbl">扩写正文</span><span class="det" id="draftDet">按节推进，保持口吻与设定</span></span><span class="ok"></span></div>
+        <div class="bar"><i id="barFill"></i></div>
+        <div class="draft" id="draftBox">
+          <p data-line>雨停的时候，沈夜把怀表推回抽屉最底层。</p>
+          <p data-line>「你说谎时，左手会先动。」对面的人笑了。</p>
+          <p data-line>雾从港口漫上来，盖住了第三码头的灯。</p>
+        </div>
+        <div class="step" data-step><span class="dot"></span><span><span class="lbl">记忆入库</span><span class="det">本集摘要 · 人物状态 · 伏笔变化</span></span><span class="ok"></span></div>
+        <div class="chiprow" id="chipRow">
+          <span class="chip" data-chip>摘要已生成</span>
+          <span class="chip" data-chip>沈夜：已离开雾港</span>
+          <span class="chip" data-chip>伏笔「撕碎的照片」待回收</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 特性 -->
+  <section id="features">
+    <h2 class="sec">为连载创作而设计</h2>
+    <p class="secsub">连载最难的不是写一集，是写到第五十集还不崩。</p>
+    <div class="grid">
+      <div class="card">
+        <div class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#7C3AED" stroke-width="1.8" stroke-linecap="round"><ellipse cx="12" cy="5.5" rx="7" ry="2.8"/><path d="M5 5.5v6c0 1.6 3.1 2.9 7 2.9s7-1.3 7-2.9v-6"/><path d="M5 11.5v6c0 1.6 3.1 2.9 7 2.9s7-1.3 7-2.9v-6"/></svg></div>
+        <h3>前情记忆</h3>
+        <p>写每一集之前，先检索之前的剧情：近几集摘要、每个人物的当前状态、还没回收的伏笔，再动笔。人名、口吻、设定不漂移。</p>
+      </div>
+      <div class="card">
+        <div class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#7C3AED" stroke-width="1.8" stroke-linecap="round"><path d="M5 4h11l3 3v13H5z"/><path d="M8.5 9h7M8.5 12.5h7M8.5 16h4.5"/></svg></div>
+        <h3>大纲先行</h3>
+        <p>先出大纲再写正文。小说按起承转合分节，网剧按场次推进；你审过的大纲，就是 AI 扩写的唯一依据。</p>
+      </div>
+      <div class="card">
+        <div class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#7C3AED" stroke-width="1.8" stroke-linecap="round"><circle cx="10" cy="8" r="3.4"/><path d="M4 20c.6-3.4 3-5 6-5s5.4 1.6 6 5"/><path d="M16.5 5.5a3.4 3.4 0 0 1 0 5.8M18.8 15.4c1 .8 1.7 2 2 4.1"/></svg></div>
+        <h3>人物卡</h3>
+        <p>小传、定位、当前状态都记在卡上。每写完一集，AI 自动更新人物状态；你也可以随时手动修正。</p>
+      </div>
+      <div class="card">
+        <div class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#7C3AED" stroke-width="1.8" stroke-linecap="round"><path d="M12 20v-6"/><path d="M12 14c0-3.5 2.6-5.5 6-5.5 0 3.5-2.6 5.5-6 5.5Z"/><path d="M12 11C12 7.8 9.8 6 6.5 6c0 3.2 2.2 5 5.5 5Z"/></svg></div>
+        <h3>伏笔追踪</h3>
+        <p>埋下的钩子逐条登记，回收状态一目了然。写下一集时，未回收的伏笔会被主动提醒进上下文。</p>
+      </div>
+      <div class="card">
+        <div class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#7C3AED" stroke-width="1.8" stroke-linecap="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></div>
+        <h3>人工审稿 · 信任模式</h3>
+        <p>大纲写完先停下来等你过目，改完再扩写；赶进度时打开信任模式，大纲自动通过、一气呵成。</p>
+      </div>
+      <div class="card">
+        <div class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#7C3AED" stroke-width="1.8" stroke-linecap="round"><path d="M4.5 8.5A8 8 0 1 1 4 13.5"/><path d="M4 4.5v5h5"/></svg></div>
+        <h3>版本历史</h3>
+        <p>重写、编辑、覆盖之前都自动存档。哪一版都不丢，随时恢复，还能沿用好大纲只重写正文。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 四步 -->
+  <section id="how">
+    <h2 class="sec">写一集，四步</h2>
+    <p class="secsub">从定调到成稿，你只需要做两个决定：大纲行不行，正文发不发。</p>
+    <div class="steps">
+      <div class="stepbox"><p class="n">01</p><h3>定世界观</h3><p>梗概、世界观、风格要求写一次，之后每一集都沿着它走。</p></div>
+      <div class="stepbox"><p class="n">02</p><h3>出大纲</h3><p>AI 带着前情记忆先列大纲：本集讲什么、钩子埋在哪。</p></div>
+      <div class="stepbox"><p class="n">03</p><h3>审稿</h3><p>你过目、修改、通过；或者开信任模式交给它。</p></div>
+      <div class="stepbox"><p class="n">04</p><h3>连载</h3><p>扩写成稿、一致性检查、摘要入记忆库——下一集接着来。</p></div>
+    </div>
+  </section>
+
+  <!-- 导出与发布 -->
+  <section id="publish">
+    <div class="publish">
+      <div>
+        <h3>写完，不锁在站里</h3>
+        <p>作品随时可以整本带走：合并 TXT、合订 Markdown、按集分章的平台导出包。连 Luna 助手都认识你的作品——直接问它「上一集谁动了怀表」，它会去记忆库里查。</p>
+      </div>
+      <ul>
+        <li><span class="tag">导出</span><span><b>平台导出包</b>：按集分好的 TXT，起点 / 番茄作家助手导入自动分章</span></li>
+        <li><span class="tag">有声</span><span><b>一键有声版</b>：每集合成 MP3，上传喜马拉雅主播平台</span></li>
+        <li><span class="tag">连读</span><span><b>全集连读</b>：顺读全文、全文搜索、总字数统计</span></li>
+        <li><span class="tag">提醒</span><span><b>完工通知</b>：长任务写完，顶栏铃铛第一时间告诉你</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <div class="cta-band">
+    <h2>你的故事，值得被写完</h2>
+    <p>从第一集开始，一集一集写下去。</p>
+    <div class="row">
+      <a class="btn btn-primary" href="https://af.0326.cc.cd">进入工作室</a>
+      <a class="btn btn-ghost" href="https://github.com/Zhaojjjjjj/agentflow">GitHub 仓库</a>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <div class="wrap">
+    <span>AgentFlow · AI 连载创作平台</span>
+    <span class="sp"></span>
+    <a href="https://af.0326.cc.cd">在线体验</a>
+    <a href="https://github.com/Zhaojjjjjj/agentflow">GitHub</a>
+  </div>
+</footer>
+
+<script>
+// 演示动画：一集的写作流程循环播放（集数逐集递增）
+(function(){
+  var steps = Array.prototype.slice.call(document.querySelectorAll("[data-step]"));
+  var lines = Array.prototype.slice.call(document.querySelectorAll("[data-line]"));
+  var chips = Array.prototype.slice.call(document.querySelectorAll("[data-chip]"));
+  var bar = document.getElementById("barFill");
+  var epLabel = document.getElementById("epLabel");
+  var ep = 13;
+  var timers = [];
+  function later(fn, ms){ timers.push(setTimeout(fn, ms)); }
+  function reset(){
+    timers.forEach(clearTimeout); timers = [];
+    steps.forEach(function(s){ s.className = "step"; s.querySelector(".ok").textContent = ""; });
+    lines.forEach(function(l){ l.classList.remove("on"); });
+    chips.forEach(function(c){ c.classList.remove("on"); });
+    bar.style.width = "0";
+    epLabel.textContent = "第 " + ep + " 集";
+  }
+  function runStep(i, dur, doneText){
+    var s = steps[i]; if(!s) return;
+    s.classList.add("on","doing");
+    later(function(){ s.classList.remove("doing"); s.classList.add("done"); s.querySelector(".ok").textContent = doneText || ""; }, dur);
+  }
+  function cycle(){
+    reset();
+    runStep(0, 900, "已读取");
+    later(function(){ runStep(1, 1100, "4 节"); }, 1000);
+    later(function(){ runStep(2, 800, "已通过"); }, 2300);
+    later(function(){
+      runStep(3, 2600, "约 2,500 字");
+      lines.forEach(function(l, i){ later(function(){ l.classList.add("on"); bar.style.width = Math.round((i+1)/lines.length*100) + "%"; }, 350 + i*650); });
+    }, 3300);
+    later(function(){
+      runStep(4, 900, "已更新");
+      chips.forEach(function(c, i){ later(function(){ c.classList.add("on"); }, 200 + i*280); });
+    }, 6300);
+    later(function(){ ep += 1; cycle(); }, 8600);
+  }
+  cycle();
+})();
+</script>
+</body>
+</html>
