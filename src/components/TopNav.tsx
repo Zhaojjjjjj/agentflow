@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import UserMenu, { useMe } from "./UserMenu";
+import NotificationBell from "./NotificationBell";
 import CommandPalette from "./CommandPalette";
 import Logo from "./Logo";
 
@@ -58,7 +59,10 @@ export default function TopNav() {
               <kbd className="kbd">⌘K</kbd>
             </button>
             {me ? (
-              <UserMenu user={me} />
+              <>
+                <NotificationBell />
+                <UserMenu user={me} />
+              </>
             ) : (
               me === null && (
                 <Link href="/login" className="btn-secondary">

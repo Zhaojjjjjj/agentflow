@@ -155,7 +155,7 @@ export async function POST(req: NextRequest) {
             const label = CHAT_SKILL_LABELS[tc.name] || "准备文件";
             send("status", JSON.stringify({ text: `正在${label}` }));
             try {
-              const result = await executeChatSkill(tc.name, tc.arguments);
+              const result = await executeChatSkill(tc.name, tc.arguments, { userId: me.id, role: me.role });
               const fileSummaries: string[] = [];
               for (const f of result.files) {
                 const { data: att, error } = await sb
@@ -187,7 +187,7 @@ export async function POST(req: NextRequest) {
               roundMessages.push({
                 role: "tool",
                 tool_call_id: tc.id,
-                content: `${result.summary}（文件：${fileSummaries.join("、")}）`,
+                content: result.files.length ? `${result.summary}（文件：${fileSummaries.join("、")}）` : result.summary,
               });
             } catch (e) {
               roundMessages.push({

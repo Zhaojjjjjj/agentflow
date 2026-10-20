@@ -470,6 +470,12 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
           desc={`${project.kind === "drama" ? "网剧剧本" : "长篇小说"}${project.genre ? ` · ${project.genre}` : ""} · 单集约 ${project.episode_target_words} 字`}
           actions={
             <div className="flex gap-2">
+              <Link
+                href={`/studio/${projectId}/read`}
+                className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 transition-colors hover:bg-slate-50"
+              >
+                连读全文
+              </Link>
               <ExportMenu projectId={projectId} />
               <Button variant="secondary" size="sm" onClick={() => setDeleting(true)}>删除作品</Button>
               <Button variant="primary" disabled={writing} onClick={writeNext}>

@@ -3,6 +3,8 @@ import { graphvizSkill } from "./graphviz";
 import { drawioSkill } from "./drawio";
 import { jsonCanvasSkill } from "./jsonCanvas";
 import { markdownSkill, codeSkill, csvSkill, jsonSkill, htmlSkill } from "./files";
+import { storySearchSkill } from "./storySearch";
+import type { SkillContext } from "./types";
 
 export const CHAT_SKILLS: ChatSkill[] = [
   graphvizSkill,
@@ -13,6 +15,7 @@ export const CHAT_SKILLS: ChatSkill[] = [
   csvSkill,
   jsonSkill,
   htmlSkill,
+  storySearchSkill,
 ];
 
 export const CHAT_SKILL_MAP = new Map(CHAT_SKILLS.map((s) => [s.name, s]));
@@ -44,15 +47,18 @@ export const SKILL_SYSTEM_PROMPT = `你可以使用以下技能（需要时主�
 7. json_data — 用户想要结构化 JSON 数据文件时调用。
 8. html_page — 用户想要一个「能打开看的页面」（可视化报告、小工具、落地页草稿、动画演示）时调用。返回单文件 HTML，聊天内可直接交互预览。
 
+【作品记忆】
+9. search_story_memory — 用户问起自己在工作室连载的作品剧情（某集发生了什么、某人物现在什么状态、某伏笔回收没有、某段设定）时调用。它会检索真实的剧情记忆库，严格基于返回的资料回答，资料里没有的不要编造。
+
 规则：
 - 当用户说"画个流程图""整理成文档""导出表格""做个页面看看"或明显需要文件/可视化时，直接调用相应技能生成文件，再用一句话介绍文件内容和怎么用。
 - 文件生成后，用 2~3 句话介绍它：这是什么文件、点哪里预览/下载、一个使用小贴士。不要只回一句"做好了"。
 - 一次回答最多调用 2 个技能；不要为了调用而调用，纯文字能讲清楚就别用技能。`;
 
-export async function executeChatSkill(name: string, args: Record<string, unknown>) {
+export async function executeChatSkill(name: string, args: Record<string, unknown>, ctx?: SkillContext) {
   const skill = CHAT_SKILL_MAP.get(name);
   if (!skill) throw new Error(`未知技能: ${name}`);
-  return skill.execute(args);
+  return skill.execute(args, ctx);
 }
 
 /** 技能中文名（用于思考步骤展示） */
@@ -65,4 +71,5 @@ export const CHAT_SKILL_LABELS: Record<string, string> = {
   csv_table: "整理表格",
   json_data: "准备数据",
   html_page: "做页面",
+  search_story_memory: "查剧情记忆",
 };

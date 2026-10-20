@@ -16,11 +16,16 @@ export interface SkillResult {
   files: SkillFile[];
 }
 
+export interface SkillContext {
+  userId?: string;
+  role?: string;
+}
+
 export interface ChatSkill {
   name: string;
   description: string;
   parameters: Record<string, unknown>;
-  execute: (args: Record<string, unknown>) => Promise<SkillResult>;
+  execute: (args: Record<string, unknown>, ctx?: SkillContext) => Promise<SkillResult>;
 }
 
 export function escXml(s: string): string {

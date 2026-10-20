@@ -317,6 +317,31 @@ export default function EpisodeDetail({ projectId, episodeId }: { projectId: str
     }
   };
 
+  const [audioBusy, setAudioBusy] = useState(false);
+  const generateAudio = async () => {
+    setAudioBusy(true);
+    try {
+      const res = await fetch(`/api/studio/projects/${projectId}/episodes/${episodeId}/audio`, { method: "POST" });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j.error || "有声版生成失败");
+      }
+      const blob = await res.blob();
+      const cd = res.headers.get("Content-Disposition") || "";
+      const m = cd.match(/filename\*=UTF-8''([^;]+)/);
+      const name = m ? decodeURIComponent(m[1]) : "audio.mp3";
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = name; a.click();
+      URL.revokeObjectURL(url);
+      toast.success("有声版已下载，可上传到喜马拉雅主播平台");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "有声版生成失败");
+    } finally {
+      setAudioBusy(false);
+    }
+  };
+
   if (loading) {
     return (
       <>
@@ -477,6 +502,9 @@ export default function EpisodeDetail({ projectId, episodeId }: { projectId: str
               <div className="flex gap-2">
                 <a className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50" href={`/api/studio/projects/${projectId}/episodes/${episodeId}/export?format=txt`}>导出 TXT</a>
                 <a className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50" href={`/api/studio/projects/${projectId}/episodes/${episodeId}/export?format=md`}>导出 MD</a>
+                <Button variant="secondary" size="sm" disabled={audioBusy} onClick={generateAudio}>
+                  {audioBusy ? "合成中…" : "生成有声版"}
+                </Button>
                 <Button variant="secondary" size="sm" onClick={() => setEditingContent(true)}>编辑正文</Button>
               </div>
             )}
