@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { toast } from "@/components/toast";
-import { PageHeader, Button, Field, Input } from "@/components/ui";
+import { PageHeader, Button, Field, Input, Skeleton } from "@/components/ui";
 import { useMe, type MeUser } from "@/components/UserMenu";
 
 function AvatarBlock({ user, onChanged }: { user: MeUser; onChanged: (url: string) => void }) {
@@ -128,7 +128,7 @@ export default function AccountPage() {
   if (me === undefined) {
     return (
       <main className="mx-auto max-w-3xl px-6 py-10">
-        <p className="text-sm text-slate-400">加载中…</p>
+        <Skeleton rows={6} />
       </main>
     );
   }
