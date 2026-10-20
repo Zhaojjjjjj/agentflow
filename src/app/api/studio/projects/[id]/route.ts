@@ -48,6 +48,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (body.episode_target_words !== undefined) {
     patch.episode_target_words = Math.min(Math.max(500, Number(body.episode_target_words) || 2500), 20000);
   }
+  if (body.auto_approve_outline !== undefined) {
+    patch.auto_approve_outline = body.auto_approve_outline === true || body.auto_approve_outline === "true";
+  }
   const sb = getSupabase();
   const { error } = await sb.from("story_projects").update(patch).eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

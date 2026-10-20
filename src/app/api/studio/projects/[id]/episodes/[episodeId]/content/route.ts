@@ -3,6 +3,7 @@ import { getSupabase } from "@/lib/supabase";
 import { authUser, unauthorized, canAccessProject } from "@/lib/access";
 import { latestJob } from "@/lib/studio/jobs";
 import { generateSummary, countWords } from "@/lib/studio/pipeline";
+import { archiveEpisodeVersion } from "@/lib/studio/versions";
 
 type Params = { params: Promise<{ id: string; episodeId: string }> };
 
@@ -35,6 +36,9 @@ export async function PUT(req: NextRequest, { params }: Params) {
     .single();
   if (!ep) return NextResponse.json({ error: "剧集不存在" }, { status: 404 });
   const row = ep as { number: number; title: string };
+
+  // 覆盖前存档到版本历史
+  await archiveEpisodeVersion(episodeId, "edit");
 
   const wordCount = countWords(content);
   // 摘要同步更新，保证下一集的前情检索拿到的是润色后的版本

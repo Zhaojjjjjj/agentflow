@@ -3,12 +3,16 @@ import { getSupabase } from "@/lib/supabase";
 import { authUser, unauthorized, canAccessProject } from "@/lib/access";
 import { inngest, EVENTS } from "@/lib/inngest";
 import { createJob, latestJob, updateJob, failJob } from "@/lib/studio/jobs";
+import { archiveEpisodeVersion } from "@/lib/studio/versions";
 
 type Params = { params: Promise<{ id: string; episodeId: string }> };
 
 /**
- * POST 重写本集：清空旧大纲/正文 → 建新任务 → 触发 Inngest 流水线。
- * 有正在运行的任务时先取消。
+ * POST 重写本集。
+ * body.mode:
+ *  - "full"（默认）：清空旧大纲/正文 → 建新任务 → 完整流水线
+ *  - "redraft"：保留大纲、只清正文 → 流水线跳过大纲生成与审稿，直接扩写
+ * 两种模式都会先把当前版本存档到版本历史。
  */
 export async function POST(req: NextRequest, { params }: Params) {
   const me = await authUser(req);
@@ -17,18 +21,24 @@ export async function POST(req: NextRequest, { params }: Params) {
   if (!(await canAccessProject(id, me))) {
     return NextResponse.json({ error: "作品不存在或无权访问" }, { status: 404 });
   }
+  const body = await req.json().catch(() => ({}));
+  const mode: "full" | "redraft" = body.mode === "redraft" ? "redraft" : "full";
+
   const sb = getSupabase();
-  const { data: ep, error: epErr } = await sb
+  const { data: ep } = await sb
     .from("episodes")
-    .select("id, number")
+    .select("id, number, outline")
     .eq("id", episodeId)
     .eq("project_id", id)
     .single();
-  // PGRST116 = 查无此行（真正的 404）；其他错误（列名/权限/网络）必须报真实原因，
-  // 不能再伪装成"剧集不存在"（同 context.ts 列名 bug 的教训）。
-  if (epErr && epErr.code !== "PGRST116")
-    return NextResponse.json({ error: `读取剧集失败：${epErr.message}` }, { status: 500 });
   if (!ep) return NextResponse.json({ error: "剧集不存在" }, { status: 404 });
+  const outline = (ep as { outline: string }).outline || "";
+  if (mode === "redraft" && !outline.trim()) {
+    return NextResponse.json({ error: "本集还没有大纲，无法沿用大纲重写" }, { status: 400 });
+  }
+
+  // 覆盖前存档
+  await archiveEpisodeVersion(episodeId, mode === "redraft" ? "redraft" : "retry");
 
   // 取消旧任务
   const oldJob = await latestJob(episodeId);
@@ -36,17 +46,11 @@ export async function POST(req: NextRequest, { params }: Params) {
     await updateJob(oldJob.id, { status: "cancelled", progress: "已开始重写，旧任务取消" });
   }
 
-  // 重置剧集（含封面提示词与已上传封面）
-  const { data: oldEp } = await sb.from("episodes").select("cover_url").eq("id", episodeId).single();
-  const oldCover = (oldEp as { cover_url?: string } | null)?.cover_url;
-  if (oldCover) {
-    const m = oldCover.match(/\/covers\/(.+)$/);
-    if (m) await sb.storage.from("covers").remove([m[1]]);
-  }
-  const { error: resetErr } = await sb
-    .from("episodes")
-    .update({ outline: "", content: "", summary: "", word_count: 0, status: "draft", cover_prompt: "", cover_url: "" })
-    .eq("id", episodeId);
+  // 重置剧集（redraft 保留大纲）
+  const reset = mode === "redraft"
+    ? { content: "", summary: "", word_count: 0, status: "draft" }
+    : { outline: "", content: "", summary: "", word_count: 0, status: "draft" };
+  const { error: resetErr } = await sb.from("episodes").update(reset).eq("id", episodeId);
   if (resetErr) return NextResponse.json({ error: resetErr.message }, { status: 500 });
 
   // 建新任务并触发流水线
@@ -54,7 +58,7 @@ export async function POST(req: NextRequest, { params }: Params) {
   try {
     await inngest.send({
       name: EVENTS.EPISODE_WRITE_REQUESTED,
-      data: { jobId: job.id, episodeId, projectId: id },
+      data: { jobId: job.id, episodeId, projectId: id, mode },
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -64,5 +68,5 @@ export async function POST(req: NextRequest, { params }: Params) {
       { status: 202 }
     );
   }
-  return NextResponse.json({ jobId: job.id });
+  return NextResponse.json({ jobId: job.id, mode });
 }

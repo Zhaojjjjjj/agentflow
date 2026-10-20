@@ -63,7 +63,38 @@ export function parseSections(outline: string, kind: "novel" | "drama"): Outline
   }
   if (cur) sections.push(cur);
   // 过滤掉"梗概"节（不扩写）
-  return sections.filter((s) => !/^梗概/.test(s.title)).map((s) => ({ ...s, points: s.points.trim() }));
+  const byMarker = sections.filter((s) => !/^梗概/.test(s.title)).map((s) => ({ ...s, points: s.points.trim() }));
+  if (byMarker.length > 0) return byMarker;
+
+  // 兜底：LLM 没按标题格式输出大纲时，不报错——按空行分段切分，
+  // 每段一段（过长的段再按句号边界二次切分，控制单节扩写的提示长度）。
+  const paragraphs = outline
+    .split(/\n\s*\n/)
+    .map((p) => p.trim())
+    .filter((p) => p.length > 0 && !/^梗概/.test(p));
+  if (paragraphs.length === 0) return [];
+  const chunks: string[] = [];
+  for (const p of paragraphs) {
+    if (p.length <= 600) {
+      chunks.push(p);
+    } else {
+      // 超长段按句末标点切到 ~500 字一块
+      let buf = "";
+      for (const sent of p.split(/(?<=[。！？…])\s*/)) {
+        if (buf && buf.length + sent.length > 500) {
+          chunks.push(buf);
+          buf = sent;
+        } else {
+          buf += sent;
+        }
+      }
+      if (buf.trim()) chunks.push(buf.trim());
+    }
+  }
+  return chunks.map((text, i) => {
+    const firstLine = text.split("\n")[0].slice(0, 30);
+    return { title: `第 ${i + 1} 节 · ${firstLine}`, points: text };
+  });
 }
 
 /** 扩写某一节/场 */
