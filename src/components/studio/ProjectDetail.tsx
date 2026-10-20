@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import TopNav from "@/components/TopNav";
@@ -155,6 +155,67 @@ function AddThread({ projectId, onDone }: { projectId: string; onDone: () => voi
 }
 
 
+
+function ExportMenu({ projectId }: { projectId: string }) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, [open ]);
+
+  const download = async (format: "txt" | "md" | "zip") => {
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/studio/projects/${projectId}/export?format=${format}`);
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j.error || "导出失败");
+      }
+      const blob = await res.blob();
+      const cd = res.headers.get("Content-Disposition") || "";
+      const m = cd.match(/filename\*=UTF-8''([^;]+)/);
+      const name = m ? decodeURIComponent(m[1]) : `export.${format}`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = name; a.click();
+      URL.revokeObjectURL(url);
+      setOpen(false);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "导出失败");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="relative" ref={ref}>
+      <Button variant="secondary" size="sm" disabled={busy} onClick={() => setOpen((v) => !v)}>
+        {busy ? "导出中…" : "导出"}
+      </Button>
+      {open && (
+        <div className="absolute right-0 z-50 mt-1 w-56 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
+          <button onClick={() => download("txt")} className="block w-full px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50">
+            合并 TXT
+            <span className="block text-xs text-slate-400">全书一卷，可导入作家助手</span>
+          </button>
+          <button onClick={() => download("md")} className="block w-full px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50">
+            合订 Markdown
+            <span className="block text-xs text-slate-400">带章节标题，存档/排版用</span>
+          </button>
+          <button onClick={() => download("zip")} className="block w-full px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50">
+            平台导出包（zip）
+            <span className="block text-xs text-slate-400">按集分章 TXT，起点/番茄通用</span>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const SETTINGS_GENRES = ["玄幻", "都市", "悬疑", "科幻", "言情", "历史", "奇幻", "现实题材", "其他"];
 
 /** 设定 tab：受控表单，双栏（基本信息 / 创作设定），有改动才允许保存 */
@@ -166,6 +227,7 @@ function SettingsForm({ projectId, project, onSaved }: { projectId: string; proj
   const [worldview, setWorldview] = useState(project.worldview);
   const [style, setStyle] = useState(project.style_notes);
   const [saving, setSaving] = useState(false);
+  const [trust, setTrust] = useState(!!(project as Project & { auto_approve_outline?: boolean }).auto_approve_outline);
 
   const dirty =
     title !== project.title ||
@@ -173,7 +235,8 @@ function SettingsForm({ projectId, project, onSaved }: { projectId: string; proj
     words !== (project.episode_target_words || 2500) ||
     premise !== project.premise ||
     worldview !== project.worldview ||
-    style !== project.style_notes;
+    style !== project.style_notes ||
+    trust !== !!((project as Project & { auto_approve_outline?: boolean }).auto_approve_outline);
 
   const save = async () => {
     if (!title.trim()) return toast.error("作品标题不能为空");
@@ -182,7 +245,7 @@ function SettingsForm({ projectId, project, onSaved }: { projectId: string; proj
       const res = await fetch(`/api/studio/projects/${projectId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: title.trim(), genre, premise, worldview, style_notes: style, episode_target_words: words }),
+        body: JSON.stringify({ title: title.trim(), genre, premise, worldview, style_notes: style, episode_target_words: words, auto_approve_outline: trust }),
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(j.error || "保存失败");
@@ -222,6 +285,17 @@ function SettingsForm({ projectId, project, onSaved }: { projectId: string; proj
               onChange={(e) => setWords(Number(e.target.value))}
               className="w-full accent-[#7C3AED]"
             />
+          </Field>
+          <Field label="信任模式" hint="开启后，大纲不再停下等你审稿，自动通过直接扩写">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={trust}
+              onClick={() => setTrust((v) => !v)}
+              className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${trust ? "bg-brand-600" : "bg-slate-200"}`}
+            >
+              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${trust ? "left-[22px]" : "left-0.5"}`} />
+            </button>
           </Field>
         </div>
       </div>
@@ -396,6 +470,7 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
           desc={`${project.kind === "drama" ? "网剧剧本" : "长篇小说"}${project.genre ? ` · ${project.genre}` : ""} · 单集约 ${project.episode_target_words} 字`}
           actions={
             <div className="flex gap-2">
+              <ExportMenu projectId={projectId} />
               <Button variant="secondary" size="sm" onClick={() => setDeleting(true)}>删除作品</Button>
               <Button variant="primary" disabled={writing} onClick={writeNext}>
                 {writing ? "创建中…" : episodes.length === 0 ? "写第一集" : "写下一集"}
