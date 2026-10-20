@@ -1,7 +1,57 @@
 "use client";
 
-import { useState, type ButtonHTMLAttributes, type ReactNode } from "react";
+import { useEffect, useState, type ButtonHTMLAttributes, type ReactNode } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
+
+/** open 时按 Esc 触发 onClose */
+export function useEscapeClose(open: boolean, onClose: () => void) {
+  useEffect(() => {
+    if (!open) return;
+    const h = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [open, onClose]);
+}
+
+/* ---------- Accordion（折叠面板，替代原生 <details>） ---------- */
+
+export function Accordion({
+  title,
+  defaultOpen = false,
+  className = "",
+  children,
+}: {
+  title: string;
+  defaultOpen?: boolean;
+  className?: string;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className={`card ${className}`}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between px-5 py-4 text-left"
+      >
+        <span className="text-sm font-medium text-slate-700">{title}</span>
+        <svg
+          className={`h-4 w-4 shrink-0 text-slate-400 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+          viewBox="0 0 16 16"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M4 6l4 4 4-4" />
+        </svg>
+      </button>
+      {open && <div className="border-t border-slate-100 px-5 py-4">{children}</div>}
+    </div>
+  );
+}
 
 /* ---------- Button ---------- */
 

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import TopNav from "@/components/TopNav";
-import { Button, EmptyState, Field, Input, Textarea, Select, Badge, PageHeader, Skeleton } from "@/components/ui";
+import { Button, EmptyState, Field, Input, Textarea, Select, Badge, PageHeader, Skeleton, useEscapeClose } from "@/components/ui";
 import { toast } from "@/components/toast";
 
 interface Project {
@@ -28,6 +28,7 @@ function NewProjectModal({ open, onClose, onCreated }: { open: boolean; onClose:
   const [styleNotes, setStyleNotes] = useState("");
   const [words, setWords] = useState(2500);
   const [busy, setBusy] = useState(false);
+  useEscapeClose(open, onClose);
 
   const submit = async () => {
     if (!title.trim()) return toast.error("请填写作品标题");
@@ -66,7 +67,7 @@ function NewProjectModal({ open, onClose, onCreated }: { open: boolean; onClose:
       >
         <h3 className="text-lg font-semibold text-slate-900">新建作品</h3>
         <p className="mt-1 text-sm text-slate-500">先定下世界观和风格，之后每一集都会沿着它往下写。</p>
-        <div className="mt-5 space-y-4">
+        <div className="mt-5">
           <Field label="作品标题">
             <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="比如：雾港夜行" maxLength={60} />
           </Field>

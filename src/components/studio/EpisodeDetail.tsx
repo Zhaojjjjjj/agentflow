@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import TopNav from "@/components/TopNav";
-import { Button, Badge, PageHeader, Skeleton, EmptyState, Markdown } from "@/components/ui";
+import { Button, Badge, PageHeader, Skeleton, EmptyState, Markdown, Accordion } from "@/components/ui";
 import { toast } from "@/components/toast";
 import { confirmDialog } from "@/components/confirm";
 
@@ -54,6 +54,25 @@ function WritingLoader({ progress, stageLabel }: { progress?: string; stageLabel
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+/** 封面提示词的小型行内折叠 */
+function CoverPromptToggle({ prompt, onCopy }: { prompt: string; onCopy: () => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div>
+      <div className="flex items-center justify-between">
+        <button onClick={() => setOpen((v) => !v)} className="flex items-center gap-1 text-sm font-medium text-slate-700">
+          封面图提示词
+          <svg className={`h-3.5 w-3.5 text-slate-400 transition-transform duration-200 ${open ? "rotate-180" : ""}`} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 6l4 4 4-4" />
+          </svg>
+        </button>
+        <button onClick={onCopy} className="shrink-0 text-sm text-brand-600 hover:text-brand-700">复制</button>
+      </div>
+      {open && <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-600">{prompt}</p>}
     </div>
   );
 }
@@ -387,15 +406,7 @@ export default function EpisodeDetail({ projectId, episodeId }: { projectId: str
             )}
             <div className="mt-3">
               {episode.cover_prompt ? (
-                <details>
-                  <summary className="cursor-pointer text-sm font-medium text-slate-700">封面图提示词</summary>
-                  <div className="mt-2 flex items-start justify-between gap-2">
-                    <p className="whitespace-pre-wrap text-sm leading-6 text-slate-600">{episode.cover_prompt}</p>
-                    <button onClick={copyCoverPrompt} className="shrink-0 text-sm text-brand-600 hover:text-brand-700">
-                      复制
-                    </button>
-                  </div>
-                </details>
+                <CoverPromptToggle prompt={episode.cover_prompt} onCopy={copyCoverPrompt} />
               ) : (
                 <p className="text-sm text-slate-400">正文完成后自动生成，可复制去外部生图，再回来上传。</p>
               )}
@@ -443,12 +454,9 @@ export default function EpisodeDetail({ projectId, episodeId }: { projectId: str
 
         {/* 大纲（非审稿态也展示） */}
         {!needReview && episode.outline && (
-          <details className="card mb-6 p-5">
-            <summary className="cursor-pointer text-sm font-medium text-slate-700">本集大纲</summary>
-            <div className="mt-3">
-              <Markdown text={episode.outline} />
-            </div>
-          </details>
+          <Accordion title="本集大纲" className="mb-6">
+            <Markdown text={episode.outline} />
+          </Accordion>
         )}
     </>
   );
@@ -494,10 +502,9 @@ export default function EpisodeDetail({ projectId, episodeId }: { projectId: str
   const summaryCard = (
     <>
 {episode.summary && (
-          <details className="card mb-6 p-5">
-            <summary className="cursor-pointer text-sm font-medium text-slate-700">剧情摘要（记忆用）</summary>
-            <p className="mt-3 text-sm leading-7 text-slate-600">{episode.summary}</p>
-          </details>
+          <Accordion title="剧情摘要（记忆用）" className="mb-6">
+            <p className="text-sm leading-7 text-slate-600">{episode.summary}</p>
+          </Accordion>
         )}
     </>
   );

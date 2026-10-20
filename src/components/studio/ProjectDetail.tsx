@@ -4,8 +4,9 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import TopNav from "@/components/TopNav";
-import { Button, EmptyState, Field, Input, Textarea, Badge, PageHeader, Skeleton, ConfirmDialog } from "@/components/ui";
+import { Button, EmptyState, Field, Input, Textarea, Select, Badge, PageHeader, Skeleton, ConfirmDialog, useEscapeClose } from "@/components/ui";
 import { toast } from "@/components/toast";
+import { confirmDialog } from "@/components/confirm";
 
 interface Project {
   id: string;
@@ -17,6 +18,7 @@ interface Project {
   style_notes: string;
   episode_target_words: number;
   status: string;
+  updated_at: string;
 }
 interface Episode {
   id: string;
@@ -61,6 +63,7 @@ function AddCharacter({ projectId, onDone }: { projectId: string; onDone: () => 
   const [role, setRole] = useState("");
   const [profile, setProfile] = useState("");
   const [busy, setBusy] = useState(false);
+  useEscapeClose(open, () => setOpen(false));
   const submit = async () => {
     if (!name.trim()) return toast.error("请填写人物姓名");
     setBusy(true);
@@ -88,7 +91,7 @@ function AddCharacter({ projectId, onDone }: { projectId: string; onDone: () => 
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" onClick={() => setOpen(false)}>
           <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-base font-semibold text-slate-900">添加人物</h3>
-            <div className="mt-4 space-y-3">
+            <div className="mt-4">
               <Field label="姓名"><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="比如：沈夜" /></Field>
               <Field label="定位"><Input value={role} onChange={(e) => setRole(e.target.value)} placeholder="比如：主角 / 反派 / 配角" /></Field>
               <Field label="小传"><Textarea rows={4} value={profile} onChange={(e) => setProfile(e.target.value)} placeholder="背景、性格、目标……" /></Field>
@@ -108,6 +111,7 @@ function AddThread({ projectId, onDone }: { projectId: string; onDone: () => voi
   const [open, setOpen] = useState(false);
   const [desc, setDesc] = useState("");
   const [busy, setBusy] = useState(false);
+  useEscapeClose(open, () => setOpen(false));
   const submit = async () => {
     if (!desc.trim()) return toast.error("请填写伏笔内容");
     setBusy(true);
@@ -142,6 +146,153 @@ function AddThread({ projectId, onDone }: { projectId: string; onDone: () => voi
             <div className="mt-5 flex justify-end gap-2">
               <Button variant="secondary" size="sm" onClick={() => setOpen(false)}>取消</Button>
               <Button variant="primary" size="sm" disabled={busy} onClick={submit}>登记</Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+
+const SETTINGS_GENRES = ["玄幻", "都市", "悬疑", "科幻", "言情", "历史", "奇幻", "现实题材", "其他"];
+
+/** 设定 tab：受控表单，双栏（基本信息 / 创作设定），有改动才允许保存 */
+function SettingsForm({ projectId, project, onSaved }: { projectId: string; project: Project; onSaved: () => void }) {
+  const [title, setTitle] = useState(project.title);
+  const [genre, setGenre] = useState(project.genre || SETTINGS_GENRES[1]);
+  const [words, setWords] = useState(project.episode_target_words || 2500);
+  const [premise, setPremise] = useState(project.premise);
+  const [worldview, setWorldview] = useState(project.worldview);
+  const [style, setStyle] = useState(project.style_notes);
+  const [saving, setSaving] = useState(false);
+
+  const dirty =
+    title !== project.title ||
+    genre !== (project.genre || SETTINGS_GENRES[1]) ||
+    words !== (project.episode_target_words || 2500) ||
+    premise !== project.premise ||
+    worldview !== project.worldview ||
+    style !== project.style_notes;
+
+  const save = async () => {
+    if (!title.trim()) return toast.error("作品标题不能为空");
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/studio/projects/${projectId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: title.trim(), genre, premise, worldview, style_notes: style, episode_target_words: words }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error || "保存失败");
+      toast.success("已保存");
+      onSaved();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "保存失败");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="grid gap-6 lg:grid-cols-2">
+      <div className="card p-6">
+        <h3 className="mb-5 font-semibold text-slate-900">基本信息</h3>
+        <div className="space-y-5">
+          <Field label="作品标题">
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={60} />
+          </Field>
+          <Field label="类型">
+            <div>
+              <Badge tone={project.kind === "drama" ? "purple" : "gray"}>{project.kind === "drama" ? "网剧剧本" : "长篇小说"}</Badge>
+              <span className="ml-2 text-xs text-slate-400">创建后不可更改（影响生成结构）</span>
+            </div>
+          </Field>
+          <Field label="题材">
+            <Select value={genre} onChange={(e) => setGenre(e.target.value)}>
+              {SETTINGS_GENRES.map((g) => (
+                <option key={g} value={g}>{g}</option>
+              ))}
+            </Select>
+          </Field>
+          <Field label={`单集目标字数：${words} 字`} hint="下一集起生效">
+            <input
+              type="range" min={800} max={8000} step={100} value={words}
+              onChange={(e) => setWords(Number(e.target.value))}
+              className="w-full accent-[#7C3AED]"
+            />
+          </Field>
+        </div>
+      </div>
+      <div className="card p-6">
+        <h3 className="mb-5 font-semibold text-slate-900">创作设定</h3>
+        <div className="space-y-5">
+          <Field label="故事梗概" hint="一句话或一段话：这个故事讲什么">
+            <Textarea rows={4} value={premise} onChange={(e) => setPremise(e.target.value)} />
+          </Field>
+          <Field label="世界观设定" hint="时代、地点、规则，越具体连载越稳">
+            <Textarea rows={4} value={worldview} onChange={(e) => setWorldview(e.target.value)} />
+          </Field>
+          <Field label="风格要求" hint="可选：语言风格、节奏、视角">
+            <Textarea rows={3} value={style} onChange={(e) => setStyle(e.target.value)} />
+          </Field>
+        </div>
+      </div>
+      <div className="flex items-center justify-end gap-3 lg:col-span-2">
+        {dirty && <span className="text-xs text-slate-400">有未保存的修改</span>}
+        <Button variant="primary" disabled={!dirty || saving} onClick={save}>
+          {saving ? "保存中…" : "保存设定"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+
+function CharacterEditor({ projectId, character, onDone }: { projectId: string; character: Character; onDone: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState(character.name);
+  const [role, setRole] = useState(character.role || "");
+  const [profile, setProfile] = useState(character.profile || "");
+  const [state, setState] = useState(character.current_state || "");
+  const [busy, setBusy] = useState(false);
+  useEscapeClose(open, () => setOpen(false));
+  const submit = async () => {
+    if (!name.trim()) return toast.error("请填写人物姓名");
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/studio/projects/${projectId}/characters/${character.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: name.trim(), role, profile, current_state: state }),
+      });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error || "保存失败");
+      setOpen(false);
+      onDone();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "保存失败");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <>
+      <button className="text-xs text-slate-500 hover:text-slate-700" onClick={() => setOpen(true)}>编辑</button>
+      {open && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" onClick={() => setOpen(false)}>
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-base font-semibold text-slate-900">编辑人物</h3>
+            <div className="mt-4">
+              <Field label="姓名"><Input value={name} onChange={(e) => setName(e.target.value)} /></Field>
+              <Field label="定位"><Input value={role} onChange={(e) => setRole(e.target.value)} /></Field>
+              <Field label="小传"><Textarea rows={4} value={profile} onChange={(e) => setProfile(e.target.value)} /></Field>
+              <Field label="当前状态" hint="手动修正 AI 记忆的人物状态"><Input value={state} onChange={(e) => setState(e.target.value)} placeholder="比如：第 3 集后已离开雾港" /></Field>
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <Button variant="secondary" size="sm" onClick={() => setOpen(false)}>取消</Button>
+              <Button variant="primary" size="sm" disabled={busy} onClick={submit}>保存</Button>
             </div>
           </div>
         </div>
@@ -258,10 +409,10 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={`px-4 py-2.5 text-sm transition-colors ${
+              className={`-mb-px border-b-2 px-4 py-2.5 text-sm transition-colors ${
                 tab === t.id
-                  ? "border-b-2 border-brand-600 font-medium text-brand-700"
-                  : "text-slate-500 hover:text-slate-800"
+                  ? "border-brand-600 font-medium text-brand-700"
+                  : "border-transparent text-slate-500 hover:text-slate-800"
               }`}
             >
               {t.label}
@@ -288,9 +439,13 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
                     </span>
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-medium text-slate-900">{e.title || `第 ${e.number} 集`}</p>
-                      <p className="text-xs text-slate-400">
-                        {jobActive ? `${job.stageLabel}… ${job.progress}` : e.word_count > 0 ? `${e.word_count} 字` : "未成稿"}
-                      </p>
+                      {job && job.status === "failed" ? (
+                        <p className="text-xs text-red-500">写作失败：{job.progress || "点进详情查看"} — 点击可重写</p>
+                      ) : (
+                        <p className="text-xs text-slate-400">
+                          {jobActive ? `${job.stageLabel}… ${job.progress}` : e.word_count > 0 ? `${e.word_count} 字` : "未成稿"}
+                        </p>
+                      )}
                     </div>
                     {jobActive && job.stage === "outline_review" ? (
                       <Badge tone="amber">待审稿</Badge>
@@ -312,10 +467,22 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
             ) : (
               <div className="grid gap-4 sm:grid-cols-2">
                 {characters.map((c) => (
-                  <div key={c.id} className="card p-5">
+                  <div key={c.id} className="card group p-5">
                     <div className="flex items-center gap-2">
                       <h3 className="font-semibold text-slate-900">{c.name}</h3>
                       {c.role && <Badge tone="gray">{c.role}</Badge>}
+                      <div className="ml-auto flex gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+                        <CharacterEditor projectId={projectId} character={c} onDone={() => void load()} />
+                        <button
+                          className="text-xs text-red-500 hover:text-red-600"
+                          onClick={async () => {
+                            const ok = await confirmDialog({ title: `删除人物「${c.name}」？`, message: "后续写作将不再参考这个人物。", confirmText: "删除", danger: true });
+                            if (!ok) return;
+                            const res = await fetch(`/api/studio/projects/${projectId}/characters/${c.id}`, { method: "DELETE" });
+                            if (res.ok) { toast.success("已删除"); void load(); } else toast.error("删除失败");
+                          }}
+                        >删除</button>
+                      </div>
                     </div>
                     {c.profile && <p className="mt-2 text-sm leading-6 text-slate-600">{c.profile}</p>}
                     {c.current_state && <p className="mt-2 text-xs text-slate-400">当前状态：{c.current_state}</p>}
@@ -343,7 +510,30 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
                         {t.status === "resolved" && t.resolved_episode ? ` · 回收于第 ${t.resolved_episode} 集` : ""}
                       </p>
                     </div>
-                    <Badge tone={t.status === "open" ? "amber" : "green"}>{t.status === "open" ? "未回收" : "已回收"}</Badge>
+                    <div className="flex shrink-0 items-center gap-3">
+                      <Badge tone={t.status === "open" ? "amber" : "green"}>{t.status === "open" ? "未回收" : "已回收"}</Badge>
+                      <button
+                        className="text-xs text-slate-500 hover:text-slate-700"
+                        onClick={async () => {
+                          const next = t.status === "open" ? "resolved" : "open";
+                          const res = await fetch(`/api/studio/projects/${projectId}/threads/${t.id}`, {
+                            method: "PATCH",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ status: next }),
+                          });
+                          if (res.ok) void load(); else toast.error("操作失败");
+                        }}
+                      >{t.status === "open" ? "标记回收" : "重新打开"}</button>
+                      <button
+                        className="text-xs text-red-500 hover:text-red-600"
+                        onClick={async () => {
+                          const ok = await confirmDialog({ title: "删除这条伏笔？", confirmText: "删除", danger: true });
+                          if (!ok) return;
+                          const res = await fetch(`/api/studio/projects/${projectId}/threads/${t.id}`, { method: "DELETE" });
+                          if (res.ok) { toast.success("已删除"); void load(); } else toast.error("删除失败");
+                        }}
+                      >删除</button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -352,30 +542,7 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
         )}
 
         {tab === "settings" && (
-          <div className="card max-w-2xl space-y-4 p-6">
-            <Field label="故事梗概"><Textarea rows={3} defaultValue={project.premise} id="f-premise" /></Field>
-            <Field label="世界观设定"><Textarea rows={4} defaultValue={project.worldview} id="f-worldview" /></Field>
-            <Field label="风格要求"><Textarea rows={2} defaultValue={project.style_notes} id="f-style" /></Field>
-            <Button
-              variant="primary"
-              onClick={async () => {
-                const get = (id: string) => (document.getElementById(id) as HTMLTextAreaElement).value;
-                const res = await fetch(`/api/studio/projects/${projectId}`, {
-                  method: "PATCH",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    premise: get("f-premise"),
-                    worldview: get("f-worldview"),
-                    style_notes: get("f-style"),
-                  }),
-                });
-                if (!res.ok) toast.error("保存失败");
-                else toast.success("已保存");
-              }}
-            >
-              保存设定
-            </Button>
-          </div>
+          <SettingsForm key={project.updated_at} projectId={projectId} project={project} onSaved={() => void load()} />
         )}
       </main>
       <ConfirmDialog
