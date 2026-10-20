@@ -199,17 +199,23 @@ export default function EpisodeDetail({ projectId, episodeId }: { projectId: str
     }
   };
 
-  const retryEpisode = async () => {
+  const retryEpisode = async (mode: "full" | "redraft" = "full") => {
     const ok = await confirmDialog({
-      title: "重写本集？",
-      message: "现有大纲和正文会被清空，重新开始写作。",
+      title: mode === "redraft" ? "沿用大纲重写正文？" : "重写本集？",
+      message: mode === "redraft"
+        ? "保留当前大纲，只重新扩写正文。旧正文会存入版本历史。"
+        : "现有大纲和正文会被清空，重新开始写作。旧版本会存入版本历史。",
       confirmText: "重写",
       danger: true,
     });
     if (!ok) return;
     setActing(true);
     try {
-      const res = await fetch(`/api/studio/projects/${projectId}/episodes/${episodeId}/retry`, { method: "POST" });
+      const res = await fetch(`/api/studio/projects/${projectId}/episodes/${episodeId}/retry`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode }),
+      });
       const j = await res.json();
       if (!res.ok) throw new Error(j.error || "重写失败");
       if (j.warning) toast.error(j.warning);
@@ -468,7 +474,11 @@ export default function EpisodeDetail({ projectId, episodeId }: { projectId: str
           <div className="mb-4 flex items-center justify-between">
             <h3 className="font-semibold text-slate-900">正文</h3>
             {episode.content && !jobRunning && !editingContent && (
-              <Button variant="secondary" size="sm" onClick={() => setEditingContent(true)}>编辑正文</Button>
+              <div className="flex gap-2">
+                <a className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50" href={`/api/studio/projects/${projectId}/episodes/${episodeId}/export?format=txt`}>导出 TXT</a>
+                <a className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50" href={`/api/studio/projects/${projectId}/episodes/${episodeId}/export?format=md`}>导出 MD</a>
+                <Button variant="secondary" size="sm" onClick={() => setEditingContent(true)}>编辑正文</Button>
+              </div>
             )}
             {editingContent && (
               <div className="flex gap-2">
@@ -499,6 +509,10 @@ export default function EpisodeDetail({ projectId, episodeId }: { projectId: str
     </>
   );
 
+  const versionsCard = (
+    <VersionsPanel projectId={projectId} episodeId={episodeId} disabled={jobRunning} onRestored={() => void load()} />
+  );
+
   const summaryCard = (
     <>
 {episode.summary && (
@@ -521,8 +535,11 @@ export default function EpisodeDetail({ projectId, episodeId }: { projectId: str
           desc={episode.word_count > 0 ? `共 ${episode.word_count} 字` : "写作中"}
           actions={
             <div className="flex gap-2">
+              {!jobRunning && episode.outline && (
+                <Button variant="secondary" size="sm" disabled={acting} onClick={() => retryEpisode("redraft")}>沿用大纲重写</Button>
+              )}
               {!jobRunning && (
-                <Button variant="secondary" size="sm" disabled={acting} onClick={retryEpisode}>重新写</Button>
+                <Button variant="secondary" size="sm" disabled={acting} onClick={() => retryEpisode("full")}>重新写</Button>
               )}
               {jobRunning && (
                 <Button variant="secondary" size="sm" disabled={acting} onClick={cancelJob}>取消任务</Button>
@@ -546,6 +563,7 @@ export default function EpisodeDetail({ projectId, episodeId }: { projectId: str
               {coverCard}
               {outlineSection}
               {summaryCard}
+              {versionsCard}
             </aside>
           </div>
         ) : (
@@ -555,9 +573,96 @@ export default function EpisodeDetail({ projectId, episodeId }: { projectId: str
             {outlineSection}
             {contentCard}
             {summaryCard}
+            {versionsCard}
           </>
         )}
       </main>
     </>
+  );
+}
+
+interface EpisodeVersion {
+  id: string;
+  source: string;
+  word_count: number;
+  created_at: string;
+  summary: string;
+}
+
+const VERSION_SOURCE_LABEL: Record<string, string> = {
+  pipeline: "流水线覆盖",
+  edit: "手动编辑前",
+  retry: "重写前",
+  restore: "恢复前",
+  redraft: "沿用大纲重写前",
+};
+
+function VersionsPanel({ projectId, episodeId, disabled, onRestored }: { projectId: string; episodeId: string; disabled?: boolean; onRestored: () => void }) {
+  const [versions, setVersions] = useState<EpisodeVersion[] | null>(null);
+  const [restoring, setRestoring] = useState("");
+
+  const loadVersions = useCallback(async () => {
+    const res = await fetch(`/api/studio/projects/${projectId}/episodes/${episodeId}/versions`).catch(() => null);
+    if (res && res.ok) {
+      const j = await res.json();
+      setVersions(j.versions ?? []);
+    } else setVersions([]);
+  }, [projectId, episodeId]);
+
+  useEffect(() => {
+    void loadVersions();
+  }, [loadVersions]);
+
+  const restore = async (v: EpisodeVersion) => {
+    const ok = await confirmDialog({
+      title: "恢复到这个版本？",
+      message: "当前的大纲和正文会先存入版本历史，再被该版本替换。",
+      confirmText: "恢复",
+    });
+    if (!ok) return;
+    setRestoring(v.id);
+    try {
+      const res = await fetch(`/api/studio/projects/${projectId}/episodes/${episodeId}/versions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ versionId: v.id }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error || "恢复失败");
+      toast.success("已恢复");
+      onRestored();
+      void loadVersions();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "恢复失败");
+    } finally {
+      setRestoring("");
+    }
+  };
+
+  if (!versions || versions.length === 0) return null;
+  return (
+    <Accordion title={`版本历史（${versions.length}）`} className="mb-6">
+      <ul className="space-y-3">
+        {versions.map((v) => (
+          <li key={v.id} className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-sm text-slate-700">
+                {VERSION_SOURCE_LABEL[v.source] ?? v.source}
+                <span className="ml-2 text-xs text-slate-400">{v.word_count} 字</span>
+              </p>
+              <p className="text-xs text-slate-400">{new Date(v.created_at).toLocaleString("zh-CN")}</p>
+              {v.summary && <p className="mt-0.5 line-clamp-2 text-xs leading-5 text-slate-500">{v.summary}</p>}
+            </div>
+            <button
+              disabled={disabled || restoring === v.id}
+              onClick={() => restore(v)}
+              className="shrink-0 text-sm text-brand-600 hover:text-brand-700 disabled:opacity-40"
+            >
+              {restoring === v.id ? "恢复中…" : "恢复"}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </Accordion>
   );
 }

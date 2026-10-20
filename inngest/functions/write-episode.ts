@@ -10,6 +10,7 @@ import { inngest, EVENTS } from "@/lib/inngest";
 import { getSupabase } from "@/lib/supabase";
 import { gatherContext } from "@/lib/studio/context";
 import { updateJob, failJob, type JobStage } from "@/lib/studio/jobs";
+import { archiveEpisodeVersion } from "@/lib/studio/versions";
 import {
   generateOutline,
   parseSections,
@@ -24,6 +25,8 @@ interface WriteEventData {
   jobId: string;
   episodeId: string;
   projectId: string;
+  /** full=完整流水线；redraft=保留已有大纲、跳过生成与审稿、直接扩写 */
+  mode?: "full" | "redraft";
 }
 
 interface ApprovalEventData {
@@ -56,6 +59,7 @@ export const writeEpisode = inngest.createFunction(
   { event: EVENTS.EPISODE_WRITE_REQUESTED },
   async ({ event, step }) => {
     const { jobId, episodeId, projectId } = event.data as WriteEventData;
+    const mode = (event.data as WriteEventData).mode ?? "full";
 
     try {
       // ---- 1. 前情检索 ----
@@ -65,29 +69,44 @@ export const writeEpisode = inngest.createFunction(
         return await gatherContext(projectId, episodeNumber);
       });
 
-      // ---- 2. 生成大纲 ----
-      await step.run("generate-outline", async () => {
-        await setStage(jobId, "outline", "正在生成本集大纲…");
-        const outline = await generateOutline(ctx);
-        await saveOutline(episodeId, outline);
-      });
-
-      // ---- 3. 人工审稿（等待用户确认） ----
-      await setStage(jobId, "outline_review", "大纲已生成，等待你审稿确认");
-      const approval = await step.waitForEvent("wait-outline-approval", {
-        event: EVENTS.OUTLINE_APPROVED,
-        match: "data.jobId",
-        timeout: "7d",
-      });
-      if (!approval) {
-        await updateJob(jobId, { status: "cancelled", progress: "审稿超时（7天），任务已取消" });
-        return { ok: false, reason: "approval-timeout" };
+      // ---- 2-3. 大纲：生成（或复用）+ 审稿（或信任模式自动通过） ----
+      let finalOutline: string;
+      if (mode === "redraft") {
+        finalOutline = await step.run("load-existing-outline", async () => {
+          await setStage(jobId, "outline", "沿用已有大纲，直接扩写正文…");
+          const existing = await getEpisodeOutline(episodeId);
+          if (!existing.trim()) throw new Error("本集还没有大纲，无法沿用大纲重写，请用全部重写");
+          return existing;
+        });
+      } else {
+        const generated = await step.run("generate-outline", async () => {
+          await setStage(jobId, "outline", "正在生成本集大纲…");
+          const outline = await generateOutline(ctx);
+          await saveOutline(episodeId, outline);
+          return outline;
+        });
+        const autoApprove = await isAutoApprove(projectId);
+        if (autoApprove) {
+          await setStage(jobId, "outline_review", "信任模式：大纲自动通过");
+          finalOutline = generated;
+        } else {
+          await setStage(jobId, "outline_review", "大纲已生成，等待你审稿确认");
+          const approval = await step.waitForEvent("wait-outline-approval", {
+            event: EVENTS.OUTLINE_APPROVED,
+            match: "data.jobId",
+            timeout: "7d",
+          });
+          if (!approval) {
+            await updateJob(jobId, { status: "cancelled", progress: "审稿超时（7天），任务已取消" });
+            return { ok: false, reason: "approval-timeout" };
+          }
+          finalOutline = (approval.data as ApprovalEventData).outline;
+          // 用户可能改过大纲，写回
+          await step.run("save-final-outline", async () => {
+            await saveOutline(episodeId, finalOutline);
+          });
+        }
       }
-      const finalOutline = (approval.data as ApprovalEventData).outline;
-      // 用户可能改过大纲，写回
-      await step.run("save-final-outline", async () => {
-        await saveOutline(episodeId, finalOutline);
-      });
 
       // ---- 4. 分节扩写 ----
       const sections = parseSections(finalOutline, ctx.kind);
@@ -101,6 +120,7 @@ export const writeEpisode = inngest.createFunction(
         fullContent += (fullContent ? "\n\n" : "") + part;
       }
       await step.run("save-draft", async () => {
+        await archiveEpisodeVersion(episodeId, mode === "redraft" ? "redraft" : "pipeline");
         await saveContent(episodeId, fullContent);
       });
 
@@ -158,4 +178,24 @@ async function getEpisodeNumber(episodeId: string): Promise<number> {
   const sb = getSupabase();
   const { data } = await sb.from("episodes").select("number").eq("id", episodeId).single();
   return (data as { number: number } | null)?.number ?? 1;
+}
+
+async function getEpisodeOutline(episodeId: string): Promise<string> {
+  const sb = getSupabase();
+  const { data } = await sb.from("episodes").select("outline").eq("id", episodeId).single();
+  return (data as { outline: string } | null)?.outline ?? "";
+}
+
+async function isAutoApprove(projectId: string): Promise<boolean> {
+  try {
+    const sb = getSupabase();
+    const { data } = await sb
+      .from("story_projects")
+      .select("auto_approve_outline")
+      .eq("id", projectId)
+      .single();
+    return !!(data as { auto_approve_outline?: boolean } | null)?.auto_approve_outline;
+  } catch {
+    return false; // 008 未执行时降级为人工审稿
+  }
 }
