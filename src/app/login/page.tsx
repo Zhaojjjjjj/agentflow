@@ -2,87 +2,14 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import { motion } from "framer-motion";
 import { Button, Field, Input } from "@/components/ui";
+import LoginPanel from "@/components/login/LoginPanel";
 
 /** Only allow same-origin relative redirects (prevents open-redirect). */
 function safeNext(raw: string | null): string {
   if (raw && raw.startsWith("/") && !raw.startsWith("//")) return raw;
   return "/";
-}
-
-/** 左侧视觉面板：浅色连载主题——集数时间线 + wordmark */
-function VisualPanel() {
-  return (
-    <div className="relative hidden h-full w-full overflow-hidden border-r border-slate-200/70 bg-white md:block">
-      {/* 顶部淡紫光 */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-[420px]"
-        style={{ background: "radial-gradient(560px 280px at 50% -40px, rgba(124,58,237,0.10), transparent 70%)" }}
-      />
-
-      {/* 集数时间线 */}
-      <svg aria-hidden viewBox="0 0 600 800" preserveAspectRatio="xMidYMid slice" className="absolute inset-0 h-full w-full opacity-100">
-        <g>
-          <line x1={90} y1={120} x2={90} y2={680} stroke="rgba(124,58,237,0.18)" strokeWidth={2} />
-          {(
-            [
-              [90, 170, true],
-              [90, 300, true],
-              [90, 430, true],
-              [90, 560, false],
-            ] as [number, number, boolean][]
-          ).map(([x, y, done], i) => (
-            <g key={i}>
-              <circle cx={x} cy={y} r={done ? 9 : 11} fill={done ? "#7C3AED" : "#fff"} stroke="#7C3AED" strokeWidth={2} strokeDasharray={done ? "none" : "4 3"} />
-              {done && <path d={`M ${x - 4} ${y} l 3 3 l 6 -6`} stroke="#fff" strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />}
-            </g>
-          ))}
-        </g>
-        <g fontFamily="ui-monospace, monospace" fontSize={13} fill="rgba(15,23,42,0.45)">
-          <text x={120} y={175}>第 10 集 · 已发布</text>
-          <text x={120} y={305}>第 11 集 · 已发布</text>
-          <text x={120} y={435}>第 12 集 · 已发布</text>
-          <text x={120} y={565} fill="#7C3AED" fontWeight={600}>第 13 集 · 撰写中</text>
-        </g>
-        <g opacity={0.5}>
-          <rect x={120} y={190} width={180} height={6} rx={3} fill="rgba(15,23,42,0.08)" />
-          <rect x={120} y={320} width={140} height={6} rx={3} fill="rgba(15,23,42,0.08)" />
-          <rect x={120} y={450} width={160} height={6} rx={3} fill="rgba(15,23,42,0.08)" />
-          <rect x={120} y={580} width={120} height={6} rx={3} fill="rgba(124,58,237,0.25)" />
-        </g>
-      </svg>
-
-      {/* content */}
-      <div className="relative z-10 flex h-full flex-col justify-between p-12">
-        <p className="font-mono text-[11px] uppercase tracking-[0.28em] text-slate-400">
-          AI Serial Studio
-        </p>
-        <div>
-          <div className="flex items-center gap-3">
-            <span className="h-4 w-4 rounded-full bg-[#7C3AED]" />
-            <span className="text-4xl font-semibold tracking-tight text-slate-900">AgentFlow</span>
-          </div>
-          <p className="mt-5 max-w-sm text-[15px] leading-7 text-slate-500">
-            小说与网剧剧本的连载工作室——定下世界观，AI 帮你一集一集写下去。
-          </p>
-          <dl className="mt-10 flex gap-10">
-            {[
-              ["双形态", "小说 · 网剧剧本"],
-              ["记忆", "前情自动召回"],
-              ["审稿", "人工确认再续写"],
-            ].map(([v, k]) => (
-              <div key={k}>
-                <dt className="font-mono text-base font-semibold text-slate-900">{v}</dt>
-                <dd className="mt-1 font-mono text-[10px] uppercase tracking-[0.2em] text-slate-400">{k}</dd>
-              </div>
-            ))}
-          </dl>
-        </div>
-        <p className="font-mono text-[11px] text-slate-300">大纲先行 · 前情记忆 · 人工审稿</p>
-      </div>
-    </div>
-  );
 }
 
 function LoginForm() {
@@ -138,28 +65,41 @@ function LoginForm() {
   };
 
   return (
-    <div className="flex min-h-screen bg-white">
-      {/* 左：视觉面板（桌面 55%）/ 顶部横幅（移动） */}
-      <div className="hidden w-[55%] md:block">
-        <VisualPanel />
+    <div className="flex min-h-screen flex-col bg-white md:flex-row">
+      {/* 左：视觉面板（桌面 55%） */}
+      <div className="hidden w-[55%] shrink-0 md:block">
+        <LoginPanel />
       </div>
-      <div className="relative h-44 overflow-hidden bg-[#0A0A0F] md:hidden">
-        <div
-          aria-hidden
-          className="absolute -left-16 top-[-60px] h-64 w-64 rounded-full blur-[90px]"
-          style={{ background: "radial-gradient(circle, rgba(124,58,237,0.5), transparent 65%)" }}
-        />
-        <div className="relative z-10 flex h-full items-center px-6">
-          <div className="flex items-center gap-2.5">
-            <span className="h-3 w-3 rounded-full bg-[#7C3AED]" />
-            <span className="text-2xl font-semibold tracking-tight text-white">AgentFlow</span>
-          </div>
+      {/* 移动端顶部（浅色） */}
+      <div className="border-b border-slate-100 px-6 pb-5 pt-8 md:hidden">
+        <div className="flex items-center gap-2.5">
+          <svg width="24" height="24" viewBox="0 0 100 100" aria-hidden="true">
+            <g fill="none" stroke="#7C3AED" strokeWidth="11">
+              <path d="M 84.6 67.5 A 40 40 0 1 1 84.6 32.5" strokeLinecap="round" />
+            </g>
+            <circle cx="88" cy="50" r="8" fill="#7C3AED" />
+            <circle cx="50" cy="50" r="9" fill="#7C3AED" />
+          </svg>
+          <span className="text-xl font-semibold tracking-tight text-slate-900">AgentFlow</span>
+          <span className="ml-1 inline-flex items-center gap-1.5 text-xs font-medium text-[#7C3AED]">
+            <span className="relative flex h-1.5 w-1.5">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#7C3AED] opacity-60" />
+              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[#7C3AED]" />
+            </span>
+            连载进行时
+          </span>
         </div>
+        <p className="mt-2.5 text-sm leading-6 text-slate-500">小说与网剧剧本的连载工作室，一集一集写下去。</p>
       </div>
 
       {/* 右：表单区 */}
-      <div className="flex flex-1 items-center justify-center px-6 py-12">
-        <div className="w-full max-w-sm">
+      <div className="flex flex-1 items-center justify-center px-6 py-10 md:py-12">
+        <motion.div
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
+          className="w-full max-w-sm"
+        >
           <p className="font-mono text-[11px] uppercase tracking-[0.28em] text-slate-400">
             Console
           </p>
@@ -234,7 +174,7 @@ function LoginForm() {
           <p className="mt-8 text-center font-mono text-[11px] text-slate-400">
             AgentFlow · MIT
           </p>
-        </div>
+        </motion.div>
       </div>
     </div>
   );

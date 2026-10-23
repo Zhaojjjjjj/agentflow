@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { Inter, Instrument_Serif } from "next/font/google";
 import Reveal from "./Reveal";
+import LiveDemo from "./LiveDemo";
+import TiltPanel from "./TiltPanel";
+import ScrollProgress from "./ScrollProgress";
 
 const inter = Inter({ subsets: ["latin"], display: "swap" });
 const serif = Instrument_Serif({
@@ -97,7 +100,7 @@ function CharacterMini() {
 function ThreadMini() {
   return (
     <svg viewBox="0 0 200 72" className="mt-6 w-full" aria-hidden>
-      <path d="M8 36 H192" stroke="rgba(15,23,42,0.15)" strokeWidth={2} strokeDasharray="4 4" />
+      <path className="edge-flow" d="M8 36 H192" stroke="rgba(124,58,237,0.35)" strokeWidth={2} />
       <circle cx={40} cy={36} r={5} fill="#7C3AED" />
       <circle cx={100} cy={36} r={5} fill="#7C3AED" />
       <circle cx={160} cy={36} r={5} fill="none" stroke="#7C3AED" strokeWidth={2} strokeDasharray="2 2" />
@@ -155,60 +158,6 @@ const BENTO: {
   },
 ];
 
-/* Hero 视觉：连载中的作品面板 mock */
-function SerialDemo() {
-  return (
-    <div aria-hidden>
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-[15px] font-semibold text-slate-900">《雾港夜行》</p>
-          <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.18em] text-slate-400">
-            长篇小说 · 悬疑
-          </p>
-        </div>
-        <span className="rounded-full bg-[#7C3AED]/10 px-2.5 py-1 text-[11px] font-medium text-[#7C3AED]">
-          连载中
-        </span>
-      </div>
-
-      <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/70 p-3.5">
-        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-slate-400">前情提要</p>
-        <p className="mt-1.5 text-[13px] leading-6 text-slate-600">
-          沈夜在雨夜酒吧发现怀表里的照片，与三年前的雾港大火有关……
-        </p>
-      </div>
-
-      <div className="mt-3 rounded-xl border border-[#7C3AED]/30 bg-[#7C3AED]/[0.03] p-3.5">
-        <div className="flex items-center justify-between">
-          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#7C3AED]">
-            第 13 集 · 大纲已确认
-          </p>
-          <span className="text-[11px] text-slate-400">✓ 已审稿</span>
-        </div>
-        <ul className="mt-2 space-y-1.5 text-[13px] leading-5 text-slate-600">
-          <li>· 沈夜跟踪神秘客人到旧码头</li>
-          <li>· 怀表的秘密被提起，冲突升级</li>
-          <li>· 结尾悬念：电话里的声音是谁</li>
-        </ul>
-      </div>
-
-      <div className="mt-3">
-        <div className="flex items-center justify-between text-[12px]">
-          <span className="text-slate-500">正在扩写正文…</span>
-          <span className="font-mono text-slate-400">68%</span>
-        </div>
-        <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-100">
-          <div className="h-full w-[68%] animate-pulse rounded-full bg-[#7C3AED]" />
-        </div>
-      </div>
-
-      <p className="mt-4 border-t border-slate-100 pt-3 font-mono text-[10px] uppercase tracking-[0.18em] text-slate-300">
-        已连载 12 集 · 共 31,240 字
-      </p>
-    </div>
-  );
-}
-
 /* ---------- 主组件 ---------- */
 
 export default function LandingPage() {
@@ -244,6 +193,7 @@ export default function LandingPage() {
             </Link>
           </div>
         </div>
+        <ScrollProgress />
       </header>
 
       {/* ---------- hero ---------- */}
@@ -306,19 +256,23 @@ export default function LandingPage() {
           </div>
 
           <Reveal delay={0.15} className="min-w-0">
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xl shadow-slate-200/60">
-              <div className="mb-4 flex items-center justify-between">
+            <TiltPanel>
+              <div className="mb-4 flex items-center justify-between" style={{ transform: "translateZ(24px)" }}>
                 <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-slate-400">
                   Live demo
                 </p>
-                <div className="flex gap-1.5">
-                  {["#FF5F57", "#FEBC2E", "#28C840"].map((c) => (
-                    <span key={c} className="h-2.5 w-2.5 rounded-full" style={{ background: c }} />
-                  ))}
-                </div>
+                <span className="inline-flex items-center gap-1.5 text-[11px] text-slate-400">
+                  <span className="relative flex h-1.5 w-1.5">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-60" />
+                    <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                  </span>
+                  实时演示
+                </span>
               </div>
-              <SerialDemo />
-            </div>
+              <div style={{ transform: "translateZ(12px)" }}>
+                <LiveDemo />
+              </div>
+            </TiltPanel>
           </Reveal>
         </div>
       </section>
