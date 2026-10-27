@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
     const body = (await req.json().catch(() => ({}))) as Partial<ProviderInput>;
     const created = await createProvider({
       name: String(body.name || ""),
-      kind: body.kind === "embedding" ? "embedding" : "chat",
+      kind: body.kind === "embedding" ? "embedding" : body.kind === "image" ? "image" : "chat",
       baseUrl: String(body.baseUrl || ""),
       apiKey: String(body.apiKey || ""),
       model: String(body.model || ""),
@@ -59,7 +59,7 @@ export async function PUT(req: NextRequest) {
     if (!body.id) return NextResponse.json({ error: "缺少 id" }, { status: 400 });
     const updated = await updateProvider(body.id, {
       name: body.name != null ? String(body.name) : undefined,
-      kind: body.kind === "embedding" ? "embedding" : body.kind === "chat" ? "chat" : undefined,
+      kind: body.kind === "embedding" ? "embedding" : body.kind === "chat" ? "chat" : body.kind === "image" ? "image" : undefined,
       baseUrl: body.baseUrl != null ? String(body.baseUrl) : undefined,
       apiKey: body.apiKey != null ? String(body.apiKey) : undefined,
       model: body.model != null ? String(body.model) : undefined,

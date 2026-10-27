@@ -19,7 +19,7 @@ import { Section, Toggle, IconBtn, IPlug, IUp, IDown, IPencil, ITrash, IPlus } f
 interface Provider {
   id: string;
   name: string;
-  kind: "chat" | "embedding";
+  kind: "chat" | "embedding" | "image";
   base_url: string;
   model: string;
   dimensions: number | null;
@@ -32,7 +32,7 @@ interface Provider {
 interface FormState {
   id?: string;
   name: string;
-  kind: "chat" | "embedding";
+  kind: "chat" | "embedding" | "image";
   baseUrl: string;
   apiKey: string;
   model: string;
@@ -41,7 +41,7 @@ interface FormState {
   enabled: boolean;
 }
 
-const emptyForm = (kind: "chat" | "embedding"): FormState => ({
+const emptyForm = (kind: "chat" | "embedding" | "image"): FormState => ({
   name: "",
   kind,
   baseUrl: "",
@@ -121,7 +121,7 @@ export default function SettingsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const openCreate = (kind: "chat" | "embedding") => {
+  const openCreate = (kind: "chat" | "embedding" | "image") => {
     setForm(emptyForm(kind));
     setFormErrors({});
     setModalOpen(true);
@@ -260,9 +260,9 @@ export default function SettingsPage() {
     await load();
   };
 
-  const group = (kind: "chat" | "embedding") => providers.filter((p) => p.kind === kind);
+  const group = (kind: "chat" | "embedding" | "image") => providers.filter((p) => p.kind === kind);
 
-  const renderGroup = (kind: "chat" | "embedding", title: string, desc: string) => {
+  const renderGroup = (kind: "chat" | "embedding" | "image", title: string, desc: string) => {
     const rows = group(kind);
     return (
       <div className="mb-6">
@@ -278,8 +278,8 @@ export default function SettingsPage() {
         >
           {rows.length === 0 ? (
             <EmptyState
-              title={`暂无${kind === "chat" ? "对话" : "向量"}供应商`}
-              description={kind === "chat" ? "添加后将优先于环境变量配置" : undefined}
+              title={`暂无${kind === "chat" ? "对话" : kind === "image" ? "生图" : "向量"}供应商`}
+              description={kind === "chat" ? "添加后将优先于环境变量配置" : kind === "image" ? "没有生图供应商时，生图模块会回退使用对话供应商" : undefined}
             />
           ) : (
             <div className="divide-y divide-slate-100">
@@ -432,6 +432,7 @@ export default function SettingsPage() {
               </Section>
             </div>
             {renderGroup("chat", "对话供应商", "按优先级从上到下依次试错，全部失败才报错")}
+            {renderGroup("image", "生图供应商", "专供生图模块调用图片接口（/images/generations、/images/edits），按优先级试错；未配置时回退对话供应商")}
             {renderGroup("embedding", "向量供应商（RAG）", "为连载记忆提供向量召回：把剧情与人物状态转成向量存入 pgvector，写下一集时按相似度召回前情；仅优先级最高的启用项生效，未配置时自动降级为关键词检索")}
           </>
         )}
@@ -448,10 +449,11 @@ export default function SettingsPage() {
           <Field label="类型">
             <Select
               value={form.kind}
-              onChange={(e) => setForm({ ...form, kind: e.target.value as "chat" | "embedding" })}
+              onChange={(e) => setForm({ ...form, kind: e.target.value as "chat" | "embedding" | "image" })}
               disabled={Boolean(form.id)}
             >
               <option value="chat">对话（chat）</option>
+              <option value="image">生图（image）</option>
               <option value="embedding">向量（embedding）</option>
             </Select>
           </Field>
@@ -483,7 +485,7 @@ export default function SettingsPage() {
               className="font-mono"
               value={form.model}
               onChange={(e) => setForm({ ...form, model: e.target.value })}
-              placeholder="deepseek-chat"
+              placeholder={form.kind === "image" ? "gpt-image-2" : form.kind === "embedding" ? "text-embedding-3-small" : "deepseek-chat"}
             />
           </Field>
           {form.kind === "embedding" && (

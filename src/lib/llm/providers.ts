@@ -91,13 +91,13 @@ interface DbChatRow {
 }
 
 /** Returns null when the DB has no usable rows (or the table is missing). */
-async function readProvidersFromDb(): Promise<LLMProviderConfig[] | null> {
+async function readProvidersFromDb(kind: "chat" | "image" = "chat"): Promise<LLMProviderConfig[] | null> {
   try {
     const db = getSupabase();
     const { data, error } = await db
       .from("llm_providers")
       .select("name,base_url,api_key_encrypted,model")
-      .eq("kind", "chat")
+      .eq("kind", kind)
       .eq("enabled", true)
       .order("priority", { ascending: true })
       .order("created_at", { ascending: true });
@@ -124,6 +124,19 @@ async function readProvidersFromDb(): Promise<LLMProviderConfig[] | null> {
 export async function getChatProviders(): Promise<LLMProviderConfig[]> {
   const fromDb = await readProvidersFromDb();
   return fromDb ?? readProvidersFromEnv();
+}
+
+/**
+ * 生图供应商：优先 kind='image' 的启用项（按优先级）；一个都没有时回退对话供应商，
+ * 兼容只有综合中转站的老配置。name 指定时把同名供应商提到最前。
+ */
+export async function getImageProvidersPreferred(name: string | null): Promise<LLMProviderConfig[]> {
+  const image = await readProvidersFromDb("image");
+  const all = image && image.length > 0 ? image : await getChatProviders();
+  if (!name) return all;
+  const i = all.findIndex((p) => p.name === name);
+  if (i <= 0) return all;
+  return [all[i], ...all.slice(0, i), ...all.slice(i + 1)];
 }
 
 /** Providers with a preferred one moved to the front (for chat-dedicated model config). */

@@ -6,7 +6,7 @@ import { getSupabase } from "@/lib/supabase";
 import { decryptSecret, encryptSecret, maskSecret, isEncryptionConfigured } from "@/lib/crypto";
 import { readEnvProviders } from "@/lib/llm/providers";
 
-export type ProviderKind = "chat" | "embedding";
+export type ProviderKind = "chat" | "embedding" | "image";
 
 export interface DbProvider {
   id: string;
@@ -69,7 +69,7 @@ export interface ProviderInput {
 
 function validateInput(input: ProviderInput, isCreate: boolean): string | null {
   if (!input.name?.trim()) return "名称不能为空";
-  if (input.kind !== "chat" && input.kind !== "embedding") return "类型只能是 chat 或 embedding";
+  if (input.kind !== "chat" && input.kind !== "embedding" && input.kind !== "image") return "类型只能是 chat、embedding 或 image";
   if (!input.baseUrl?.trim()) return "Base URL 不能为空";
   if (isCreate && !input.apiKey?.trim()) return "API Key 不能为空";
   if (!input.model?.trim()) return "模型不能为空";

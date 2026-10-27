@@ -1,7 +1,7 @@
 import { inngest, EVENTS } from "@/lib/inngest";
 import { getSupabase } from "@/lib/supabase";
 import { getImageModelConfig } from "@/lib/appSettings";
-import { getChatProvidersPreferred, type LLMProviderConfig } from "@/lib/llm/providers";
+import { getImageProvidersPreferred, type LLMProviderConfig } from "@/lib/llm/providers";
 
 /**
  * 生图流水线：读任务 → 调供应商 OpenAI 兼容图片接口 → 结果回存 images 桶 → 更新任务。
@@ -88,9 +88,9 @@ export const generateImage = inngest.createFunction(
       const result = await step.run("generate", async () => {
         await setProgress(jobId, job.mode === "edit" ? "正在按模板编辑图片…" : "正在生成图片…");
         const cfg = await getImageModelConfig();
-        const providers = await getChatProvidersPreferred(cfg.providerName);
+        const providers = await getImageProvidersPreferred(cfg.providerName);
         if (providers.length === 0) {
-          throw new Error("还没有配置 LLM 供应商，请管理员先在后台添加供应商。");
+          throw new Error("还没有可用的生图供应商，请管理员在后台「LLM 配置」添加类型为生图的供应商。");
         }
         let lastError: Error | null = null;
         let out: { buf: Buffer; contentType: string } | null = null;

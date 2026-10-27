@@ -20,6 +20,7 @@ interface Template {
 interface ProviderOption {
   id: string;
   name: string;
+  kind?: string;
 }
 
 const MODE_LABEL: Record<string, string> = {
@@ -85,7 +86,7 @@ export default function AdminImagesPage() {
     fetch("/api/settings/providers")
       .then((r) => r.json())
       .then((j) => {
-        if (Array.isArray(j.providers)) setProviders(j.providers.map((p: { id: string; name: string }) => ({ id: p.id, name: p.name })));
+        if (Array.isArray(j.providers)) setProviders(j.providers.map((p: { id: string; name: string; kind?: string }) => ({ id: p.id, name: p.name, kind: p.kind })));
       })
       .catch(() => {});
   }, [loadTemplates]);
@@ -197,7 +198,7 @@ export default function AdminImagesPage() {
                 onChange={(e) => setImgCfg((c) => ({ ...c, image_provider: e.target.value }))}
               >
                 <option value="">自动（按优先级）</option>
-                {providers.map((p) => (
+                {(providers.some((p) => p.kind === "image") ? providers.filter((p) => p.kind === "image") : providers).map((p) => (
                   <option key={p.id} value={p.name}>
                     {p.name}
                   </option>
