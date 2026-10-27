@@ -179,7 +179,7 @@ export default function ImageStudio() {
         {tplError ? (
           <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{tplError}</p>
         ) : (
-          <div className="mt-3 flex gap-3 overflow-x-auto pb-2">
+          <div className="-mx-1 mt-2 flex gap-3 overflow-x-auto px-1 pb-2.5 pt-1.5">
             <button
               onClick={() => setSelectedId(null)}
               className={`w-44 shrink-0 rounded-2xl border p-4 text-left transition ${
@@ -328,35 +328,40 @@ export default function ImageStudio() {
             还没有生成过图片，从上面选个模板开始吧。
           </div>
         ) : (
-          <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+          <div className="mt-4 columns-2 gap-4 sm:columns-3 lg:columns-4">
             {jobs.map((job) => (
-              <motion.div key={job.id} layout initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} className="group overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
-                <div className={`relative ${job.size === "1024x1536" ? "aspect-[2/3]" : job.size === "1536x1024" ? "aspect-[3/2]" : "aspect-square"} bg-slate-50`}>
-                  {job.status === "succeeded" && job.result_url ? (
-                    <button onClick={() => setLightbox(job)} className="block h-full w-full">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={job.result_url} alt={job.template_name || "生成图"} className="h-full w-full object-cover" loading="lazy" />
-                    </button>
-                  ) : job.status === "running" ? (
-                    <div className="flex h-full flex-col items-center justify-center gap-3 px-4 text-center">
-                      {job.source_url && (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={job.source_url} alt="原图" className="absolute inset-0 h-full w-full object-cover opacity-25" />
-                      )}
-                      <span className="relative flex h-9 w-9 items-center justify-center">
-                        <span className="absolute h-full w-full animate-spin rounded-full border-2 border-[#7C3AED]/20 border-t-[#7C3AED]" />
-                        <span className="h-2 w-2 rounded-full bg-[#7C3AED]" />
-                      </span>
-                      <p className="relative text-xs text-slate-500">{job.progress}</p>
-                      <p className="relative text-[11px] text-slate-300">生图通常需要 30 秒到 2 分钟</p>
-                    </div>
-                  ) : (
-                    <div className="flex h-full flex-col items-center justify-center gap-2 px-4 text-center">
-                      <p className="text-sm font-medium text-red-500">生成失败</p>
-                      <p className="line-clamp-4 text-[11px] leading-4 text-slate-400">{job.error}</p>
-                    </div>
-                  )}
-                </div>
+              <motion.div key={job.id} layout initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} className="mb-4 break-inside-avoid overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+                {job.status === "succeeded" && job.result_url ? (
+                  <button onClick={() => setLightbox(job)} className="block w-full">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={job.result_url} alt={job.template_name || "生成图"} className="block h-auto w-full" loading="lazy" />
+                  </button>
+                ) : (
+                  <div
+                    className="relative bg-slate-50"
+                    style={{ aspectRatio: job.size === "1024x1536" ? "2 / 3" : job.size === "1536x1024" ? "3 / 2" : "1 / 1" }}
+                  >
+                    {job.status === "running" ? (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 text-center">
+                        {job.source_url && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={job.source_url} alt="原图" className="absolute inset-0 h-full w-full object-cover opacity-25" />
+                        )}
+                        <span className="relative flex h-9 w-9 items-center justify-center">
+                          <span className="absolute h-full w-full animate-spin rounded-full border-2 border-[#7C3AED]/20 border-t-[#7C3AED]" />
+                          <span className="h-2 w-2 rounded-full bg-[#7C3AED]" />
+                        </span>
+                        <p className="relative text-xs text-slate-500">{job.progress}</p>
+                        <p className="relative text-[11px] text-slate-300">生图通常需要 30 秒到 2 分钟</p>
+                      </div>
+                    ) : (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-4 text-center">
+                        <p className="text-sm font-medium text-red-500">生成失败</p>
+                        <p className="line-clamp-4 text-[11px] leading-4 text-slate-400">{job.error}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
                 <div className="flex items-center gap-2 px-3 py-2.5">
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-xs font-medium text-slate-700">{job.template_name || (job.mode === "edit" ? "图生图" : "自由创作")}</p>
