@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { Button, Field, Input, Select, Textarea, EmptyState, PageHeader, Badge } from "@/components/ui";
 import { toast } from "@/components/toast";
-import { Section, Toggle, IconBtn, IPencil, ITrash, IPlus } from "@/components/admin/ui";
+import { Section, Toggle, IconBtn, IPencil, ITrash, IPlus, Drawer } from "@/components/admin/ui";
+import { confirmDialog } from "@/components/confirm";
 
 interface Template {
   id: string;
@@ -150,7 +151,13 @@ export default function AdminImagesPage() {
   };
 
   const remove = async (t: Template) => {
-    if (!confirm(`删除模板「${t.name}」？历史生图记录不受影响。`)) return;
+    const ok = await confirmDialog({
+      title: `删除模板「${t.name}」`,
+      message: "删除后用户将不能再选用这个模板；历史生图记录不受影响。",
+      confirmText: "删除",
+      danger: true,
+    });
+    if (!ok) return;
     const res = await fetch(`/api/admin/image-templates/${t.id}`, { method: "DELETE" });
     const j = await res.json();
     if (!res.ok) return toast.error(j.error || "删除失败");
@@ -177,11 +184,9 @@ export default function AdminImagesPage() {
         title="生图模板"
         desc="维护生图工作台的风格模板提示词；用户选模板即可生图，或上传图片按模板编辑。"
         actions={
-          !showForm ? (
-            <Button variant="primary" size="sm" onClick={startCreate}>
-              <span className="mr-0.5 inline-flex">{IPlus}</span>新建模板
-            </Button>
-          ) : undefined
+          <Button variant="primary" size="sm" onClick={startCreate}>
+            <span className="mr-0.5 inline-flex">{IPlus}</span>新建模板
+          </Button>
         }
       />
 
@@ -259,69 +264,74 @@ export default function AdminImagesPage() {
           )}
         </Section>
 
-        {/* 编辑表单 */}
-        {showForm && (
-          <Section title={editingId ? "编辑模板" : "新建模板"} desc="提示词是模板的核心：生图时作为主提示词，用户的补充要求会附在末尾。">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="名称">
-                <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="如：旅行纪念票卡海报" />
-              </Field>
-              <Field label="排序（小的靠前）">
-                <Input
-                  type="number"
-                  value={form.sort}
-                  onChange={(e) => setForm((f) => ({ ...f, sort: Number(e.target.value) || 0 }))}
-                />
-              </Field>
-              <Field label="模式">
-                <Select value={form.mode} onChange={(e) => setForm((f) => ({ ...f, mode: e.target.value as Template["mode"] }))}>
-                  <option value="generate">文生图（输入描述生成）</option>
-                  <option value="edit">图生图（必须上传图片）</option>
-                  <option value="both">两者皆可</option>
-                </Select>
-              </Field>
-              <Field label="画幅">
-                <Select value={form.size} onChange={(e) => setForm((f) => ({ ...f, size: e.target.value }))}>
-                  {SIZE_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
+      {/* 新建/编辑：右侧抽屉（列表保持原位） */}
+      <Drawer
+        open={showForm}
+        onClose={cancelForm}
+        title={editingId ? "编辑模板" : "新建模板"}
+        desc="提示词是模板的核心：生图时作为主提示词，用户的补充要求会附在末尾。"
+        footer={
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <label className="flex items-center gap-2.5 text-sm text-slate-600">
+              <Toggle checked={form.enabled} onChange={(v) => setForm((f) => ({ ...f, enabled: v }))} label="启用" />
+              启用（用户可见）
+            </label>
+            <div className="flex gap-2">
+              <Button variant="ghost" onClick={cancelForm}>
+                取消
+              </Button>
+              <Button variant="primary" onClick={saveForm} disabled={saving}>
+                {saving ? "保存中…" : editingId ? "保存修改" : "创建模板"}
+              </Button>
             </div>
-            <div className="mt-4">
-              <Field label="一句话说明（展示给用户）">
-                <Input value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} placeholder="这个模板会做出什么样的图" />
-              </Field>
-            </div>
-            <div className="mt-4">
-              <Field label="提示词（模板全文）">
-                <Textarea
-                  value={form.prompt}
-                  onChange={(e) => setForm((f) => ({ ...f, prompt: e.target.value }))}
-                  rows={12}
-                  placeholder="写下完整的风格提示词…"
-                />
-              </Field>
-              <p className="mt-1 text-right text-[11px] text-slate-300">{form.prompt.length} / 20000 字</p>
-            </div>
-            <div className="mt-2 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
-              <label className="flex items-center gap-2.5 text-sm text-slate-600">
-                <Toggle checked={form.enabled} onChange={(v) => setForm((f) => ({ ...f, enabled: v }))} label="启用" />
-                启用（用户可见）
-              </label>
-              <div className="flex gap-2">
-                <Button variant="ghost" onClick={cancelForm}>
-                  取消
-                </Button>
-                <Button variant="primary" onClick={saveForm} disabled={saving}>
-                  {saving ? "保存中…" : editingId ? "保存修改" : "创建模板"}
-                </Button>
-              </div>
-            </div>
-          </Section>
-        )}
+          </div>
+        }
+      >
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="名称">
+            <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="如：旅行纪念票卡海报" />
+          </Field>
+          <Field label="排序（小的靠前）">
+            <Input
+              type="number"
+              value={form.sort}
+              onChange={(e) => setForm((f) => ({ ...f, sort: Number(e.target.value) || 0 }))}
+            />
+          </Field>
+          <Field label="模式">
+            <Select value={form.mode} onChange={(e) => setForm((f) => ({ ...f, mode: e.target.value as Template["mode"] }))}>
+              <option value="generate">文生图（输入描述生成）</option>
+              <option value="edit">图生图（必须上传图片）</option>
+              <option value="both">两者皆可</option>
+            </Select>
+          </Field>
+          <Field label="画幅">
+            <Select value={form.size} onChange={(e) => setForm((f) => ({ ...f, size: e.target.value }))}>
+              {SIZE_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        </div>
+        <div className="mt-4">
+          <Field label="一句话说明（展示给用户）">
+            <Input value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} placeholder="这个模板会做出什么样的图" />
+          </Field>
+        </div>
+        <div className="mt-4">
+          <Field label="提示词（模板全文）">
+            <Textarea
+              value={form.prompt}
+              onChange={(e) => setForm((f) => ({ ...f, prompt: e.target.value }))}
+              rows={16}
+              placeholder="写下完整的风格提示词…"
+            />
+          </Field>
+          <p className="mt-1 text-right text-[11px] text-slate-300">{form.prompt.length} / 20000 字</p>
+        </div>
+      </Drawer>
       </div>
     </div>
   );

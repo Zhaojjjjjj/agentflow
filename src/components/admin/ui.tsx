@@ -139,3 +139,70 @@ export const IPlus = (
     <path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
   </svg>
 );
+
+/* ---------- 右侧滑出抽屉（长表单的新建/编辑标准形态） ---------- */
+import { AnimatePresence, motion } from "framer-motion";
+import { useEscapeClose } from "@/components/ui";
+
+export function Drawer({
+  open,
+  onClose,
+  title,
+  desc,
+  footer,
+  children,
+}: {
+  open: boolean;
+  onClose: () => void;
+  title: string;
+  desc?: string;
+  /** 粘性底部操作区（取消/保存） */
+  footer?: ReactNode;
+  children: ReactNode;
+}) {
+  useEscapeClose(open, onClose);
+  return (
+    <AnimatePresence>
+      {open && (
+        <div className="fixed inset-0 z-50">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            className="absolute inset-0 bg-slate-950/40 backdrop-blur-[2px]"
+            onClick={onClose}
+          />
+          <motion.aside
+            initial={{ x: "100%" }}
+            animate={{ x: 0 }}
+            exit={{ x: "100%" }}
+            transition={{ type: "spring", stiffness: 340, damping: 34 }}
+            className="absolute right-0 top-0 flex h-full w-[min(620px,100vw)] flex-col bg-white shadow-2xl"
+            role="dialog"
+            aria-modal="true"
+            aria-label={title}
+          >
+            <header className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-4">
+              <div className="min-w-0">
+                <h2 className="text-[15px] font-semibold tracking-tight text-slate-900">{title}</h2>
+                {desc && <p className="mt-0.5 text-[13px] leading-5 text-slate-400">{desc}</p>}
+              </div>
+              <button
+                onClick={onClose}
+                aria-label="关闭"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+              >
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                  <path d="M2 2l10 10M12 2 2 12" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+                </svg>
+              </button>
+            </header>
+            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">{children}</div>
+            {footer && <footer className="border-t border-slate-100 bg-white px-6 py-4">{footer}</footer>}
+          </motion.aside>
+        </div>
+      )}
+    </AnimatePresence>
+  );
+}
