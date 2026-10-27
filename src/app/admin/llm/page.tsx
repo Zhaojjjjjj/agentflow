@@ -62,7 +62,9 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [testing, setTesting] = useState<string | null>(null);
-  const [testResults, setTestResults] = useState<Record<string, { ok: boolean; msg: string }>>({});
+  const [testResults, setTestResults] = useState<Record<string, { ok: boolean; msg: string; models?: string[] }>>({});
+  const [modelsOpenId, setModelsOpenId] = useState<string | null>(null);
+  const [modelQuery, setModelQuery] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<Provider | null>(null);
   const [importOpen, setImportOpen] = useState(false);
 
@@ -232,13 +234,19 @@ export default function SettingsPage() {
         body: JSON.stringify({ id: p.id }),
       });
       const j = await res.json();
+      const models = Array.isArray(j.models) ? (j.models as string[]) : undefined;
       setTestResults((m) => ({
         ...m,
         [p.id]: {
           ok: Boolean(j.ok),
           msg: j.ok ? `成功（${j.latencyMs}ms）— ${j.message}` : `失败：${j.message || j.error}`,
+          ...(models ? { models } : {}),
         },
       }));
+      if (j.ok && models && models.length > 0) {
+        setModelQuery("");
+        setModelsOpenId(p.id);
+      }
     } catch (e) {
       setTestResults((m) => ({
         ...m,
@@ -283,51 +291,131 @@ export default function SettingsPage() {
             />
           ) : (
             <div className="divide-y divide-slate-100">
-              {rows.map((p, idx) => (
-                <div
-                  key={p.id}
-                  className={`flex items-center gap-4 px-6 py-4 transition-colors hover:bg-slate-50/60 ${p.enabled ? "" : "opacity-55"}`}
-                >
-                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-100 font-mono text-xs font-semibold text-slate-500" title={`优先级 ${p.priority}`}>
-                    {idx + 1}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-sm font-semibold text-slate-900">{p.name}</span>
-                      <Badge tone="gray">{p.model}</Badge>
-                      {testResults[p.id] && (
-                        <Badge tone={testResults[p.id].ok ? "green" : "red"}>
-                          {testResults[p.id].msg}
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="mt-1 truncate font-mono text-xs text-slate-400">
-                      {p.base_url} · Key {p.key_mask}
-                      {p.kind === "embedding" && ` · 维度 ${p.dimensions ?? 1024}`}
-                    </div>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-1">
-                    <span className="mr-1 hidden sm:block">
-                      <Toggle checked={p.enabled} onChange={() => toggleEnabled(p)} label={p.enabled ? "禁用" : "启用"} />
+              {rows.map((p, idx) => {
+                const result = testResults[p.id];
+                const models = result?.models;
+                const modelsOpen = modelsOpenId === p.id && Boolean(models?.length);
+                const q = modelQuery.trim().toLowerCase();
+                const filteredModels = models ? (q ? models.filter((id) => id.toLowerCase().includes(q)) : models) : [];
+                const modelInList = models ? models.includes(p.model) : null;
+                return (
+                <div key={p.id} className={p.enabled ? "" : "opacity-55"}>
+                  <div className="flex items-center gap-4 px-6 py-4 transition-colors hover:bg-slate-50/60">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-100 font-mono text-xs font-semibold text-slate-500" title={`优先级 ${p.priority}`}>
+                      {idx + 1}
                     </span>
-                    <IconBtn title={testing === p.id ? "测试中…" : "测试连接"} onClick={() => test(p)} disabled={testing === p.id}>
-                      {IPlug}
-                    </IconBtn>
-                    <IconBtn title="上移（优先级更高）" onClick={() => move(p, "up")}>
-                      {IUp}
-                    </IconBtn>
-                    <IconBtn title="下移" onClick={() => move(p, "down")}>
-                      {IDown}
-                    </IconBtn>
-                    <IconBtn title="编辑" onClick={() => openEdit(p)}>
-                      {IPencil}
-                    </IconBtn>
-                    <IconBtn title="删除" danger onClick={() => setDeleteTarget(p)}>
-                      {ITrash}
-                    </IconBtn>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-sm font-semibold text-slate-900">{p.name}</span>
+                        <Badge tone="gray">{p.model}</Badge>
+                        {result && (
+                          <Badge tone={result.ok ? "green" : "red"}>
+                            {result.msg}
+                          </Badge>
+                        )}
+                        {result?.ok && models && models.length > 0 && (
+                          <button
+                            onClick={() => {
+                              setModelQuery("");
+                              setModelsOpenId(modelsOpen ? null : p.id);
+                            }}
+                            className="inline-flex items-center gap-1 rounded-full bg-[#7C3AED]/10 px-2 py-0.5 text-[11px] font-medium text-[#7C3AED] transition-colors hover:bg-[#7C3AED]/15"
+                          >
+                            {models.length} 个模型
+                            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className={`transition-transform duration-200 ${modelsOpen ? "rotate-180" : ""}`}>
+                              <path d="M2 3.5 5 6.5 8 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          </button>
+                        )}
+                      </div>
+                      <div className="mt-1 truncate font-mono text-xs text-slate-400">
+                        {p.base_url} · Key {p.key_mask}
+                        {p.kind === "embedding" && ` · 维度 ${p.dimensions ?? 1024}`}
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <span className="mr-1 hidden sm:block">
+                        <Toggle checked={p.enabled} onChange={() => toggleEnabled(p)} label={p.enabled ? "禁用" : "启用"} />
+                      </span>
+                      <IconBtn title={testing === p.id ? "测试中…" : "测试连接"} onClick={() => test(p)} disabled={testing === p.id}>
+                        {IPlug}
+                      </IconBtn>
+                      <IconBtn title="上移（优先级更高）" onClick={() => move(p, "up")}>
+                        {IUp}
+                      </IconBtn>
+                      <IconBtn title="下移" onClick={() => move(p, "down")}>
+                        {IDown}
+                      </IconBtn>
+                      <IconBtn title="编辑" onClick={() => openEdit(p)}>
+                        {IPencil}
+                      </IconBtn>
+                      <IconBtn title="删除" danger onClick={() => setDeleteTarget(p)}>
+                        {ITrash}
+                      </IconBtn>
+                    </div>
                   </div>
+
+                  {modelsOpen && models && (
+                    <div className="border-t border-slate-100 bg-slate-50/70 px-6 py-4">
+                      <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+                        <p className="text-xs font-medium text-slate-500">
+                          可用模型 <span className="font-mono text-slate-400">{filteredModels.length} / {models.length}</span>
+                        </p>
+                        {modelInList === true && (
+                          <span className="inline-flex items-center gap-1.5 text-xs text-emerald-600">
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                            当前配置的模型在列表中
+                          </span>
+                        )}
+                        {modelInList === false && (
+                          <span className="inline-flex items-center gap-1.5 text-xs text-amber-600">
+                            <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                            当前配置的「{p.model}」不在列表中，调用时会失败
+                          </span>
+                        )}
+                        {models.length > 12 && (
+                          <input
+                            value={modelQuery}
+                            onChange={(e) => setModelQuery(e.target.value)}
+                            placeholder="搜索模型…"
+                            className="ml-auto w-44 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 font-mono text-xs text-slate-700 outline-none placeholder:text-slate-300 focus:border-[#7C3AED]/50"
+                          />
+                        )}
+                      </div>
+                      {filteredModels.length > 0 ? (
+                        <div className="flex max-h-52 flex-wrap gap-1.5 overflow-y-auto pr-1">
+                          {filteredModels.map((id) => (
+                            <button
+                              key={id}
+                              title="点击复制模型名"
+                              onClick={async () => {
+                                try {
+                                  await navigator.clipboard.writeText(id);
+                                  toast.success(`已复制 ${id}`);
+                                } catch {
+                                  toast.error("复制失败，请手动选取");
+                                }
+                              }}
+                              className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 font-mono text-xs transition-colors ${
+                                id === p.model
+                                  ? "border-[#7C3AED]/50 bg-[#7C3AED]/[0.06] font-medium text-[#6D28D9]"
+                                  : "border-slate-200 bg-white text-slate-600 hover:border-[#7C3AED]/40 hover:text-slate-900"
+                              }`}
+                            >
+                              {id === p.model && <span className="h-1.5 w-1.5 rounded-full bg-[#7C3AED]" />}
+                              {id}
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="py-2 text-xs text-slate-400">没有匹配「{modelQuery}」的模型</p>
+                      )}
+                      <p className="mt-3 text-[11px] text-slate-300">点击模型名即可复制；紫色底纹的是当前配置在用的模型。要换模型，复制后点该行的编辑按钮粘贴保存。</p>
+                    </div>
+                  )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </Section>

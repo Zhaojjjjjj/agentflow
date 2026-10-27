@@ -164,6 +164,23 @@ export interface TestResult {
   ok: boolean;
   latencyMs: number;
   message: string;
+  /** /models 返回的全部模型 id（能拿到时才有；chat 探活成功则无） */
+  models?: string[];
+}
+
+/** 从 /models 的各种返回形态里提取模型 id 列表（去重、排序）。 */
+function extractModelIds(payload: unknown): string[] {
+  const raw: unknown[] = Array.isArray(payload)
+    ? payload
+    : Array.isArray((payload as { data?: unknown[] })?.data)
+      ? (payload as { data: unknown[] }).data
+      : Array.isArray((payload as { models?: unknown[] })?.models)
+        ? (payload as { models: unknown[] }).models
+        : [];
+  const ids = raw
+    .map((m) => (typeof m === "string" ? m : typeof (m as { id?: unknown })?.id === "string" ? (m as { id: string }).id : ""))
+    .filter(Boolean);
+  return Array.from(new Set(ids)).sort();
 }
 
 /** Server-side connectivity test: tries GET /models, falls back to a minimal chat call. */
@@ -182,7 +199,19 @@ export async function testConnection(
       signal: AbortSignal.timeout(15000),
     });
     if (r.ok) {
-      return { ok: true, latencyMs: Date.now() - t0, message: "连接成功（GET /models 返回 200）" };
+      const text = await r.text().catch(() => "");
+      let models: string[] | undefined;
+      try {
+        models = extractModelIds(JSON.parse(text));
+      } catch {
+        models = undefined;
+      }
+      return {
+        ok: true,
+        latencyMs: Date.now() - t0,
+        message: "连接成功（GET /models 返回 200）",
+        ...(models ? { models } : {}),
+      };
     }
   } catch {
     // fall through to chat probe
