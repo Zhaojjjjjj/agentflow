@@ -25,6 +25,17 @@ const MENUS = [
     ),
   },
   {
+    href: "/admin/images",
+    label: "生图模板",
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <rect x="1.5" y="2.5" width="13" height="11" rx="2" stroke="currentColor" strokeWidth="1.5" />
+        <circle cx="5.5" cy="6.5" r="1.3" fill="currentColor" />
+        <path d="M2 12.5 6 9l2.5 2L11 8.5l3 2.5" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  {
     href: "/admin/llm",
     label: "LLM 配置",
     icon: (

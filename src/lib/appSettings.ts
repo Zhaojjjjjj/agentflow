@@ -39,3 +39,12 @@ export async function getChatModelConfig(): Promise<{ providerName: string | nul
     systemPrompt: `${base}\n\n${SKILL_SYSTEM_PROMPT}`,
   };
 }
+
+/** Resolve which provider+model image generation should use (admin-configured, falls back to priority order). */
+export async function getImageModelConfig(): Promise<{ providerName: string | null; model: string | null }> {
+  const s = await getSettings(["image.provider", "image.model"]);
+  return {
+    providerName: s["image.provider"] || null,
+    model: s["image.model"] || null,
+  };
+}

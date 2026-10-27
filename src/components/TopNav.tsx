@@ -15,6 +15,7 @@ export default function TopNav() {
   const NAV = [
     { href: "/", label: "工作室" },
     { href: "/chat", label: "Luna" },
+    { href: "/image", label: "生图" },
     ...(me?.role === "admin" ? [{ href: "/admin", label: "管理后台" }] : []),
   ];
 
