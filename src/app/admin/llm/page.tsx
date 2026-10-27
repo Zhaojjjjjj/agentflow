@@ -14,6 +14,7 @@ import {
   ConfirmDialog,
 } from "@/components/ui";
 import { toast } from "@/components/toast";
+import { Section, Toggle, IconBtn, IPlug, IUp, IDown, IPencil, ITrash, IPlus } from "@/components/admin/ui";
 
 interface Provider {
   id: string;
@@ -264,17 +265,17 @@ export default function SettingsPage() {
   const renderGroup = (kind: "chat" | "embedding", title: string, desc: string) => {
     const rows = group(kind);
     return (
-      <section className="mb-8">
-        <div className="mb-3 flex items-center justify-between">
-          <div>
-            <h2 className="text-[15px] font-semibold text-slate-900">{title}</h2>
-            <p className="mt-0.5 text-xs text-slate-400">{desc}</p>
-          </div>
-          <Button variant="primary" size="sm" onClick={() => openCreate(kind)}>
-            添加
-          </Button>
-        </div>
-        <div className="card overflow-hidden">
+      <div className="mb-6">
+        <Section
+          title={title}
+          desc={desc}
+          flush
+          actions={
+            <Button variant="primary" size="sm" onClick={() => openCreate(kind)}>
+              <span className="mr-0.5 inline-flex">{IPlus}</span>添加供应商
+            </Button>
+          }
+        >
           {rows.length === 0 ? (
             <EmptyState
               title={`暂无${kind === "chat" ? "对话" : "向量"}供应商`}
@@ -282,16 +283,18 @@ export default function SettingsPage() {
             />
           ) : (
             <div className="divide-y divide-slate-100">
-              {rows.map((p) => (
+              {rows.map((p, idx) => (
                 <div
                   key={p.id}
-                  className={`flex flex-wrap items-center gap-3 px-4 py-3.5 ${p.enabled ? "" : "opacity-50"}`}
+                  className={`flex items-center gap-4 px-6 py-4 transition-colors hover:bg-slate-50/60 ${p.enabled ? "" : "opacity-55"}`}
                 >
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-100 font-mono text-xs font-semibold text-slate-500" title={`优先级 ${p.priority}`}>
+                    {idx + 1}
+                  </span>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-medium text-slate-900">{p.name}</span>
+                      <span className="text-sm font-semibold text-slate-900">{p.name}</span>
                       <Badge tone="gray">{p.model}</Badge>
-                      <Badge tone={p.enabled ? "green" : "gray"}>{p.enabled ? "启用" : "禁用"}</Badge>
                       {testResults[p.id] && (
                         <Badge tone={testResults[p.id].ok ? "green" : "red"}>
                           {testResults[p.id].msg}
@@ -299,41 +302,41 @@ export default function SettingsPage() {
                       )}
                     </div>
                     <div className="mt-1 truncate font-mono text-xs text-slate-400">
-                      {p.base_url} · Key {p.key_mask} · 优先级 {p.priority}
+                      {p.base_url} · Key {p.key_mask}
                       {p.kind === "embedding" && ` · 维度 ${p.dimensions ?? 1024}`}
                     </div>
                   </div>
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <Button size="sm" variant="secondary" disabled={testing === p.id} onClick={() => test(p)}>
-                      {testing === p.id ? "测试中…" : "测试连接"}
-                    </Button>
-                    <Button size="sm" variant="secondary" onClick={() => move(p, "up")} title="上移（优先级更高）">
-                      ↑
-                    </Button>
-                    <Button size="sm" variant="secondary" onClick={() => move(p, "down")} title="下移">
-                      ↓
-                    </Button>
-                    <Button size="sm" variant="secondary" onClick={() => toggleEnabled(p)}>
-                      {p.enabled ? "禁用" : "启用"}
-                    </Button>
-                    <Button size="sm" variant="secondary" onClick={() => openEdit(p)}>
-                      编辑
-                    </Button>
-                    <Button size="sm" variant="danger" onClick={() => setDeleteTarget(p)}>
-                      删除
-                    </Button>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <span className="mr-1 hidden sm:block">
+                      <Toggle checked={p.enabled} onChange={() => toggleEnabled(p)} label={p.enabled ? "禁用" : "启用"} />
+                    </span>
+                    <IconBtn title={testing === p.id ? "测试中…" : "测试连接"} onClick={() => test(p)} disabled={testing === p.id}>
+                      {IPlug}
+                    </IconBtn>
+                    <IconBtn title="上移（优先级更高）" onClick={() => move(p, "up")}>
+                      {IUp}
+                    </IconBtn>
+                    <IconBtn title="下移" onClick={() => move(p, "down")}>
+                      {IDown}
+                    </IconBtn>
+                    <IconBtn title="编辑" onClick={() => openEdit(p)}>
+                      {IPencil}
+                    </IconBtn>
+                    <IconBtn title="删除" danger onClick={() => setDeleteTarget(p)}>
+                      {ITrash}
+                    </IconBtn>
                   </div>
                 </div>
               ))}
             </div>
           )}
-        </div>
-      </section>
+        </Section>
+      </div>
     );
   };
 
   return (
-    <main className="mx-auto max-w-6xl px-6 py-8">
+    <main className="mx-auto max-w-6xl px-6 py-8 lg:px-10">
       <PageHeader
           title="LLM 供应商"
           desc="在后台管理对话与向量供应商，Key 经 AES-256-GCM 加密后入库，页面永不回显明文"
@@ -347,7 +350,7 @@ export default function SettingsPage() {
         />
 
         {!encryptionReady && (
-          <div className="card mb-6 border-red-200 bg-red-50 p-4 text-sm leading-6 text-red-700">
+          <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm leading-6 text-red-700">
             未检测到有效的 <code className="font-mono">APP_ENCRYPTION_KEY</code>（64 位 hex）。
             新增 / 更新供应商会被拒绝。请在 Vercel 环境变量中配置后重新部署，
             生成命令：<code className="font-mono">openssl rand -hex 32</code>
@@ -361,45 +364,45 @@ export default function SettingsPage() {
         ) : (
           <>
             {/* Chat 对话模型 */}
-            <section className="card mb-6 p-6">
-              <h3 className="text-sm font-semibold text-slate-800">Chat 对话模型</h3>
-              <p className="mt-1 text-xs leading-5 text-slate-400">
-                顶部导航「Chat」问答使用的模型，与创作模型相互独立。不选则按上面的对话供应商优先级自动选择。
-              </p>
-              <div className="mt-4 grid max-w-xl gap-4">
-                <Field label="供应商">
-                  <Select
-                    value={chatCfg.provider}
-                    onChange={(e) => setChatCfg((c) => ({ ...c, provider: e.target.value }))}
-                  >
-                    <option value="">按优先级自动选择</option>
-                    {providers
-                      .filter((p) => p.kind === "chat" && p.enabled)
-                      .map((p) => (
-                        <option key={p.id} value={p.name}>
-                          {p.name}（{p.model}）
-                        </option>
-                      ))}
-                  </Select>
-                </Field>
-                <Field label="模型（留空则用供应商默认模型）">
-                  <Input
-                    value={chatCfg.model}
-                    onChange={(e) => setChatCfg((c) => ({ ...c, model: e.target.value }))}
-                    placeholder="例如 gpt-4o-mini"
-                  />
-                </Field>
-                <Field label="系统提示词">
-                  <textarea
-                    value={chatCfg.system_prompt}
-                    onChange={(e) => setChatCfg((c) => ({ ...c, system_prompt: e.target.value }))}
-                    placeholder="你是 Luna，AgentFlow 的 AI 助手，用简洁清晰的中文回答。"
-                    rows={3}
-                    maxLength={4000}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-brand-400"
-                  />
-                </Field>
-                <div className="flex flex-wrap items-center gap-2.5">
+            <div className="mb-6">
+              <Section title="Chat 对话模型" desc="顶部导航「Luna」问答使用的模型，与创作模型相互独立。不选则按对话供应商优先级自动选择。">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="供应商">
+                    <Select
+                      value={chatCfg.provider}
+                      onChange={(e) => setChatCfg((c) => ({ ...c, provider: e.target.value }))}
+                    >
+                      <option value="">按优先级自动选择</option>
+                      {providers
+                        .filter((p) => p.kind === "chat" && p.enabled)
+                        .map((p) => (
+                          <option key={p.id} value={p.name}>
+                            {p.name}（{p.model}）
+                          </option>
+                        ))}
+                    </Select>
+                  </Field>
+                  <Field label="模型（留空则用供应商默认模型）">
+                    <Input
+                      value={chatCfg.model}
+                      onChange={(e) => setChatCfg((c) => ({ ...c, model: e.target.value }))}
+                      placeholder="例如 gpt-4o-mini"
+                    />
+                  </Field>
+                </div>
+                <div className="mt-4">
+                  <Field label="系统提示词">
+                    <textarea
+                      value={chatCfg.system_prompt}
+                      onChange={(e) => setChatCfg((c) => ({ ...c, system_prompt: e.target.value }))}
+                      placeholder="你是 Luna，AgentFlow 的 AI 助手，用简洁清晰的中文回答。"
+                      rows={3}
+                      maxLength={4000}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-brand-400"
+                    />
+                  </Field>
+                </div>
+                <div className="mt-5 flex flex-wrap items-center gap-2.5 border-t border-slate-100 pt-4">
                   <Button variant="primary" disabled={chatSaving || !chatCfgLoaded} onClick={saveChatCfg}>
                     {chatSaving ? "保存中…" : "保存对话配置"}
                   </Button>
@@ -422,14 +425,14 @@ export default function SettingsPage() {
                   >
                     {suggRefreshing ? "AI 生成中…" : "立即刷新题目池"}
                   </Button>
+                  <p className="w-full text-xs leading-5 text-slate-400 sm:w-auto sm:flex-1 sm:text-right">
+                    题目池每天凌晨 3 点由 AI 自动换一批（会参考近 7 天大家的提问话题），也可手动立即刷新。
+                  </p>
                 </div>
-                <p className="text-xs leading-5 text-slate-400">
-                  题目池每天凌晨 3 点由 AI 自动换一批（会参考近 7 天大家的提问话题），也可手动立即刷新。
-                </p>
-              </div>
-            </section>
+              </Section>
+            </div>
             {renderGroup("chat", "对话供应商", "按优先级从上到下依次试错，全部失败才报错")}
-            {renderGroup("embedding", "向量供应商（RAG）", "把知识库文档切块转成向量存入 pgvector，供 rag-retrieve 节点做相似检索；仅优先级最高的启用项生效")}
+            {renderGroup("embedding", "向量供应商（RAG）", "为连载记忆提供向量召回：把剧情与人物状态转成向量存入 pgvector，写下一集时按相似度召回前情；仅优先级最高的启用项生效，未配置时自动降级为关键词检索")}
           </>
         )}
 

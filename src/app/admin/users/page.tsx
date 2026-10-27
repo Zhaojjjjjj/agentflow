@@ -202,7 +202,7 @@ export default function AdminUsersPage() {
   };
 
   return (
-    <main className="mx-auto max-w-6xl px-6 py-8">
+    <main className="mx-auto max-w-6xl px-6 py-8 lg:px-10">
       <PageHeader title="用户管理" desc="创建账号、重置密码、查看每位用户的使用情况" />
 
       {loading ? (

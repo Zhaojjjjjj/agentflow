@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Button, Field, Input, Select, Textarea, EmptyState } from "@/components/ui";
+import { Button, Field, Input, Select, Textarea, EmptyState, PageHeader, Badge } from "@/components/ui";
 import { toast } from "@/components/toast";
+import { Section, Toggle, IconBtn, IPencil, ITrash, IPlus } from "@/components/admin/ui";
 
 interface Template {
   id: string;
@@ -31,22 +32,6 @@ const SIZE_OPTIONS = [
   { value: "1024x1536", label: "竖版 1024×1536（3:4 近似）" },
   { value: "1536x1024", label: "横版 1536×1024" },
 ];
-
-function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      onClick={() => onChange(!checked)}
-      className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${checked ? "bg-[#7C3AED]" : "bg-slate-200"}`}
-    >
-      <span
-        className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${checked ? "left-[22px]" : "left-0.5"}`}
-      />
-    </button>
-  );
-}
 
 const emptyForm = (): Omit<Template, "id"> => ({
   name: "",
@@ -186,93 +171,97 @@ export default function AdminImagesPage() {
   const showForm = creating || editingId !== null;
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-6 py-8">
-      <h1 className="text-xl font-semibold tracking-tight text-slate-900">生图模板</h1>
-      <p className="mt-1 text-sm text-slate-500">维护生图工作台的风格模板提示词；用户选模板即可生图，或上传图片按模板编辑。</p>
-
-      {/* 生图模型配置 */}
-      <section className="mt-6 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
-        <h2 className="text-sm font-semibold text-slate-900">生图模型</h2>
-        <p className="mt-1 text-xs leading-5 text-slate-400">
-          走供应商的 OpenAI 兼容图片接口（/images/generations 与 /images/edits）。留空则按供应商优先级自动选第一个；模型名填该供应商支持的图片模型，如 gpt-image-1。
-        </p>
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          <Field label="供应商">
-            <Select
-              value={imgCfg.image_provider}
-              onChange={(e) => setImgCfg((c) => ({ ...c, image_provider: e.target.value }))}
-            >
-              <option value="">自动（按优先级）</option>
-              {providers.map((p) => (
-                <option key={p.id} value={p.name}>
-                  {p.name}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="图片模型名">
-            <Input
-              value={imgCfg.image_model}
-              onChange={(e) => setImgCfg((c) => ({ ...c, image_model: e.target.value }))}
-              placeholder="如 gpt-image-1"
-            />
-          </Field>
-        </div>
-        <div className="mt-4 flex justify-end">
-          <Button variant="primary" onClick={saveCfg} disabled={cfgSaving}>
-            {cfgSaving ? "保存中…" : "保存配置"}
-          </Button>
-        </div>
-      </section>
-
-      {/* 模板列表 */}
-      <section className="mt-6 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-slate-900">模板列表（{templates.length}）</h2>
-          {!showForm && (
-            <Button size="sm" variant="primary" onClick={startCreate}>
-              新建模板
+    <div className="mx-auto w-full max-w-6xl px-6 py-8 lg:px-10">
+      <PageHeader
+        title="生图模板"
+        desc="维护生图工作台的风格模板提示词；用户选模板即可生图，或上传图片按模板编辑。"
+        actions={
+          !showForm ? (
+            <Button variant="primary" size="sm" onClick={startCreate}>
+              <span className="mr-0.5 inline-flex">{IPlus}</span>新建模板
             </Button>
-          )}
-        </div>
+          ) : undefined
+        }
+      />
 
-        {loadError ? (
-          <p className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{loadError}</p>
-        ) : loading ? (
-          <p className="mt-4 text-sm text-slate-400">加载中…</p>
-        ) : templates.length === 0 && !showForm ? (
-          <EmptyState title="还没有模板" description="新建第一个风格模板，用户就能在生图工作台里选用。" />
-        ) : (
-          <ul className="mt-4 divide-y divide-slate-100">
-            {templates.map((t) => (
-              <li key={t.id} className="flex items-center gap-3 py-3">
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-slate-800">
-                    {t.name}
-                    {!t.enabled && <span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-400">已停用</span>}
-                  </p>
-                  <p className="mt-0.5 truncate text-xs text-slate-400">
-                    {MODE_LABEL[t.mode]} · {t.size}
-                    {t.description ? ` · ${t.description}` : ""}
-                  </p>
-                </div>
-                <Toggle checked={t.enabled} onChange={() => toggleEnabled(t)} />
-                <Button size="sm" variant="ghost" onClick={() => startEdit(t)}>
-                  编辑
-                </Button>
-                <Button size="sm" variant="danger" onClick={() => remove(t)}>
-                  删除
-                </Button>
-              </li>
-            ))}
-          </ul>
-        )}
+      <div className="space-y-6">
+        {/* 生图模型配置 */}
+        <Section
+          title="生图模型"
+          desc="走供应商的 OpenAI 兼容图片接口（/images/generations 与 /images/edits）。留空则按供应商优先级自动选第一个；模型名填该供应商支持的图片模型，如 gpt-image-1。"
+        >
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="供应商">
+              <Select
+                value={imgCfg.image_provider}
+                onChange={(e) => setImgCfg((c) => ({ ...c, image_provider: e.target.value }))}
+              >
+                <option value="">自动（按优先级）</option>
+                {providers.map((p) => (
+                  <option key={p.id} value={p.name}>
+                    {p.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="图片模型名">
+              <Input
+                value={imgCfg.image_model}
+                onChange={(e) => setImgCfg((c) => ({ ...c, image_model: e.target.value }))}
+                placeholder="如 gpt-image-1"
+              />
+            </Field>
+          </div>
+          <div className="mt-5 flex justify-end border-t border-slate-100 pt-4">
+            <Button variant="primary" onClick={saveCfg} disabled={cfgSaving}>
+              {cfgSaving ? "保存中…" : "保存配置"}
+            </Button>
+          </div>
+        </Section>
+
+        {/* 模板列表 */}
+        <Section title={`全部模板`} desc={`共 ${templates.length} 个，启用的会出现在用户的生图工作台`} flush>
+          {loadError ? (
+            <p className="m-5 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{loadError}</p>
+          ) : loading ? (
+            <p className="px-6 py-8 text-sm text-slate-400">加载中…</p>
+          ) : templates.length === 0 ? (
+            <EmptyState title="还没有模板" description="新建第一个风格模板，用户就能在生图工作台里选用。" />
+          ) : (
+            <ul className="divide-y divide-slate-100">
+              {templates.map((t) => (
+                <li key={t.id} className={`flex items-center gap-4 px-6 py-4 transition-colors hover:bg-slate-50/60 ${t.enabled ? "" : "opacity-55"}`}>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-semibold text-slate-900">{t.name}</span>
+                      <Badge tone={t.mode === "edit" ? "purple" : t.mode === "both" ? "green" : "gray"}>
+                        {MODE_LABEL[t.mode]}
+                      </Badge>
+                      <Badge tone="gray">{t.size}</Badge>
+                    </div>
+                    <p className="mt-1 truncate text-[13px] text-slate-400">{t.description || "（无说明）"}</p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <span className="mr-1 hidden sm:block">
+                      <Toggle checked={t.enabled} onChange={() => toggleEnabled(t)} label={t.enabled ? "停用" : "启用"} />
+                    </span>
+                    <IconBtn title="编辑" onClick={() => startEdit(t)}>
+                      {IPencil}
+                    </IconBtn>
+                    <IconBtn title="删除" danger onClick={() => remove(t)}>
+                      {ITrash}
+                    </IconBtn>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Section>
 
         {/* 编辑表单 */}
         {showForm && (
-          <div className="mt-5 rounded-xl border border-[#7C3AED]/30 bg-[#7C3AED]/[0.02] p-4">
-            <h3 className="text-sm font-semibold text-slate-900">{editingId ? "编辑模板" : "新建模板"}</h3>
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <Section title={editingId ? "编辑模板" : "新建模板"} desc="提示词是模板的核心：生图时作为主提示词，用户的补充要求会附在末尾。">
+            <div className="grid gap-4 sm:grid-cols-2">
               <Field label="名称">
                 <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="如：旅行纪念票卡海报" />
               </Field>
@@ -306,7 +295,7 @@ export default function AdminImagesPage() {
               </Field>
             </div>
             <div className="mt-4">
-              <Field label="提示词（模板全文，生图时作为主提示词，用户补充要求会附在末尾）">
+              <Field label="提示词（模板全文）">
                 <Textarea
                   value={form.prompt}
                   onChange={(e) => setForm((f) => ({ ...f, prompt: e.target.value }))}
@@ -316,9 +305,9 @@ export default function AdminImagesPage() {
               </Field>
               <p className="mt-1 text-right text-[11px] text-slate-300">{form.prompt.length} / 20000 字</p>
             </div>
-            <div className="mt-2 flex items-center justify-between">
-              <label className="flex items-center gap-2 text-sm text-slate-600">
-                <Toggle checked={form.enabled} onChange={(v) => setForm((f) => ({ ...f, enabled: v }))} />
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
+              <label className="flex items-center gap-2.5 text-sm text-slate-600">
+                <Toggle checked={form.enabled} onChange={(v) => setForm((f) => ({ ...f, enabled: v }))} label="启用" />
                 启用（用户可见）
               </label>
               <div className="flex gap-2">
@@ -330,9 +319,9 @@ export default function AdminImagesPage() {
                 </Button>
               </div>
             </div>
-          </div>
+          </Section>
         )}
-      </section>
+      </div>
     </div>
   );
 }

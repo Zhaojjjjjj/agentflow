@@ -90,7 +90,7 @@ function Leaderboard({ rows }: { rows: LeaderRow[] }) {
           <span className="w-28 truncate text-sm font-medium text-slate-700">{r.username}</span>
           <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-slate-100">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-brand-500 to-brand-400 transition-all duration-500"
+              className="h-full rounded-full bg-brand-500 transition-all duration-500"
               style={{ width: `${Math.max(2, (r.tokens / max) * 100)}%` }}
             />
           </div>
@@ -127,7 +127,7 @@ export default function AdminOverviewPage() {
     : [];
 
   return (
-    <main className="mx-auto max-w-6xl px-6 py-8">
+    <main className="mx-auto max-w-6xl px-6 py-8 lg:px-10">
       <PageHeader title="数据总览" desc="平台使用情况一览" />
 
       {loading ? (
