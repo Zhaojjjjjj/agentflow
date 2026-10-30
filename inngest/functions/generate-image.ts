@@ -25,22 +25,41 @@ async function setProgress(jobId: string, progress: string) {
   await sb.from("image_jobs").update({ progress, updated_at: new Date().toISOString() }).eq("id", jobId);
 }
 
+/** 校验是否为真实图片数据（魔数），防止把占位/伪造的 b64 当成图片存下来 */
+function looksLikeImage(buf: Buffer): boolean {
+  if (buf.length < 1024) return false;
+  if (buf.subarray(0, 4).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47]))) return true; // PNG
+  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return true; // JPEG
+  if (buf.subarray(0, 4).toString("ascii") === "RIFF" && buf.subarray(8, 12).toString("ascii") === "WEBP") return true; // WebP
+  if (buf.subarray(0, 3).toString("ascii") === "GIF") return true; // GIF
+  return false;
+}
+
+async function downloadImage(url: string): Promise<{ buf: Buffer; contentType: string }> {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`下载生成结果失败（${r.status}）`);
+  const buf = Buffer.from(await r.arrayBuffer());
+  if (!looksLikeImage(buf)) throw new Error("生成结果链接下载到的不是有效图片");
+  return { buf, contentType: r.headers.get("content-type") || "image/png" };
+}
+
 async function extractBytes(payload: unknown): Promise<{ buf: Buffer; contentType: string }> {
   const data = (payload as { data?: Array<{ b64_json?: string; url?: string }> })?.data;
   const first = Array.isArray(data) ? data[0] : undefined;
   if (!first) throw new Error("供应商没有返回图片数据");
-  if (first.b64_json) {
-    return { buf: Buffer.from(first.b64_json, "base64"), contentType: "image/png" };
+  const b64 = typeof first.b64_json === "string" ? first.b64_json.trim() : "";
+  if (b64) {
+    // 有的中转站把图片 URL 直接塞进 b64_json 字段——识别出来按链接处理
+    if (/^https?:\/\//i.test(b64)) return downloadImage(b64);
+    try {
+      const buf = Buffer.from(b64, "base64");
+      if (looksLikeImage(buf)) return { buf, contentType: "image/png" };
+    } catch {
+      /* 解码失败则继续走 url */
+    }
   }
-  if (first.url) {
-    const r = await fetch(first.url);
-    if (!r.ok) throw new Error(`下载生成结果失败（${r.status}）`);
-    return {
-      buf: Buffer.from(await r.arrayBuffer()),
-      contentType: r.headers.get("content-type") || "image/png",
-    };
-  }
-  throw new Error("供应商返回的图片数据为空");
+  if (first.url) return downloadImage(first.url);
+  throw new Error("供应商返回的图片数据为空或无效");
 }
 
 async function callProvider(provider: LLMProviderConfig, model: string, job: ImageJob): Promise<{ buf: Buffer; contentType: string }> {
