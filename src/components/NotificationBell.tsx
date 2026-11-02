@@ -4,14 +4,17 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
 interface NoticeItem {
+  kind?: "episode" | "image";
   jobId: string;
   status: string;
   at: string;
-  projectId: string;
-  projectTitle: string;
-  episodeId: string;
-  episodeNumber: number;
-  episodeTitle: string;
+  projectId?: string;
+  projectTitle?: string;
+  episodeId?: string;
+  episodeNumber?: number;
+  episodeTitle?: string;
+  templateName?: string;
+  mode?: string;
 }
 
 const SEEN_KEY = "agentflow:notice-seen";
@@ -72,7 +75,7 @@ export default function NotificationBell() {
           if (!open) markAllSeen();
         }}
         className="relative rounded-lg p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
-        title="写作动态"
+        title="动态提醒"
       >
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
           <path d="M18 8a6 6 0 0 0-12 0c0 7-3 8-3 8h18s-3-1-3-8" />
@@ -86,26 +89,38 @@ export default function NotificationBell() {
       </button>
       {open && (
         <div className="absolute right-0 z-50 mt-1 w-80 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
-          <p className="border-b border-slate-100 px-4 py-2.5 text-xs font-medium text-slate-500">最近 24 小时写作动态</p>
+          <p className="border-b border-slate-100 px-4 py-2.5 text-xs font-medium text-slate-500">最近 24 小时动态</p>
           {items.length === 0 ? (
             <p className="px-4 py-6 text-center text-sm text-slate-400">暂无完成的任务</p>
           ) : (
             <ul className="max-h-80 overflow-y-auto">
               {items.map((i) => (
-                <li key={i.jobId}>
-                  <Link
-                    href={`/studio/${i.projectId}/episodes/${i.episodeId}`}
-                    onClick={() => setOpen(false)}
-                    className="block px-4 py-3 hover:bg-slate-50"
-                  >
-                    <p className="text-sm text-slate-800">
-                      <span className={i.status === "succeeded" ? "text-green-600" : "text-red-500"}>
-                        {i.status === "succeeded" ? "✓ 写完" : "✗ 失败"}
-                      </span>
-                      <span className="ml-1.5">《{i.projectTitle}》第 {i.episodeNumber} 集{i.episodeTitle ? ` ${i.episodeTitle}` : ""}</span>
-                    </p>
-                    <p className="mt-0.5 text-xs text-slate-400">{new Date(i.at).toLocaleString("zh-CN")}</p>
-                  </Link>
+                <li key={`${i.kind ?? "episode"}-${i.jobId}`}>
+                  {i.kind === "image" ? (
+                    <Link href="/image" onClick={() => setOpen(false)} className="block px-4 py-3 hover:bg-slate-50">
+                      <p className="text-sm text-slate-800">
+                        <span className={i.status === "succeeded" ? "text-green-600" : "text-red-500"}>
+                          {i.status === "succeeded" ? "✓ 生图完成" : "✗ 生图失败"}
+                        </span>
+                        <span className="ml-1.5">{i.templateName || (i.mode === "edit" ? "图生图" : "自由创作")}</span>
+                      </p>
+                      <p className="mt-0.5 text-xs text-slate-400">{new Date(i.at).toLocaleString("zh-CN")}</p>
+                    </Link>
+                  ) : (
+                    <Link
+                      href={`/studio/${i.projectId}/episodes/${i.episodeId}`}
+                      onClick={() => setOpen(false)}
+                      className="block px-4 py-3 hover:bg-slate-50"
+                    >
+                      <p className="text-sm text-slate-800">
+                        <span className={i.status === "succeeded" ? "text-green-600" : "text-red-500"}>
+                          {i.status === "succeeded" ? "✓ 写完" : "✗ 失败"}
+                        </span>
+                        <span className="ml-1.5">《{i.projectTitle}》第 {i.episodeNumber} 集{i.episodeTitle ? ` ${i.episodeTitle}` : ""}</span>
+                      </p>
+                      <p className="mt-0.5 text-xs text-slate-400">{new Date(i.at).toLocaleString("zh-CN")}</p>
+                    </Link>
+                  )}
                 </li>
               ))}
             </ul>

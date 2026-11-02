@@ -3,8 +3,8 @@ import { getSupabase } from "@/lib/supabase";
 import { authUser, unauthorized } from "@/lib/access";
 
 /**
- * GET 最近 24 小时内完成的写作任务（供 TopNav 完工提醒）。
- * 只返回当前用户自己作品的任务。
+ * GET 最近 24 小时内完成的写作 / 生图任务（供 TopNav 完工提醒）。
+ * 只返回当前用户自己的任务，两种任务按完成时间合并排序。
  */
 export async function GET(req: NextRequest) {
   const me = await authUser(req);
@@ -32,10 +32,10 @@ export async function GET(req: NextRequest) {
       story_projects: { title: string; owner_id: string };
     };
   };
-  const items = ((data ?? []) as unknown as Row[])
+  const episodeItems = ((data ?? []) as unknown as Row[])
     .filter((r) => me.role === "admin" || r.episodes.story_projects.owner_id === me.id)
-    .slice(0, 10)
     .map((r) => ({
+      kind: "episode" as const,
       jobId: r.id,
       status: r.status,
       at: r.updated_at,
@@ -45,5 +45,27 @@ export async function GET(req: NextRequest) {
       episodeNumber: r.episodes.number,
       episodeTitle: r.episodes.title,
     }));
+
+  const { data: imgData } = await sb
+    .from("image_jobs")
+    .select("id, template_name, mode, status, updated_at")
+    .eq("user_id", me.id)
+    .in("status", ["succeeded", "failed"])
+    .gte("updated_at", since)
+    .order("updated_at", { ascending: false })
+    .limit(30);
+  type ImgRow = { id: string; template_name: string; mode: string; status: string; updated_at: string };
+  const imageItems = ((imgData ?? []) as ImgRow[]).map((r) => ({
+    kind: "image" as const,
+    jobId: r.id,
+    status: r.status,
+    at: r.updated_at,
+    templateName: r.template_name,
+    mode: r.mode,
+  }));
+
+  const items = [...episodeItems, ...imageItems]
+    .sort((a, b) => (a.at < b.at ? 1 : -1))
+    .slice(0, 10);
   return NextResponse.json({ items });
 }

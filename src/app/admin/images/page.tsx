@@ -237,6 +237,10 @@ export default function AdminImagesPage() {
             <ul className="divide-y divide-slate-100">
               {templates.map((t) => (
                 <li key={t.id} className={`flex items-center gap-4 px-6 py-4 transition-colors hover:bg-slate-50/60 ${t.enabled ? "" : "opacity-55"}`}>
+                  {t.cover_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={t.cover_url} alt="" className="h-12 w-12 shrink-0 rounded-lg border border-slate-200 object-cover" />
+                  ) : null}
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-sm font-semibold text-slate-900">{t.name}</span>
@@ -319,6 +323,21 @@ export default function AdminImagesPage() {
           <Field label="一句话说明（展示给用户）">
             <Input value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} placeholder="这个模板会做出什么样的图" />
           </Field>
+        </div>
+        <div className="mt-4">
+          <Field label="示例图（封面图 URL，可选）">
+            <Input
+              value={form.cover_url}
+              onChange={(e) => setForm((f) => ({ ...f, cover_url: e.target.value }))}
+              placeholder="粘贴一张示例成品图的链接，用户端模板卡会展示它"
+            />
+          </Field>
+          {form.cover_url.trim() ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={form.cover_url.trim()} alt="示例图预览" className="mt-2 h-32 w-auto rounded-lg border border-slate-200 object-cover" />
+          ) : (
+            <p className="mt-1 text-[11px] text-slate-300">留空时用户端模板卡只显示文字；填了会先展示示例图，再看说明。</p>
+          )}
         </div>
         <div className="mt-4">
           <Field label="提示词（模板全文）">

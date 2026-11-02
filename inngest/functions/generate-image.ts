@@ -115,12 +115,16 @@ export const generateImage = inngest.createFunction(
         let out: { buf: Buffer; contentType: string } | null = null;
         for (const provider of providers) {
           const model = cfg.model || provider.model;
-          try {
-            out = await callProvider(provider, model, job);
-            break;
-          } catch (e) {
-            lastError = e instanceof Error ? e : new Error(String(e));
+          // 同一供应商先重试一次（间隔 2 秒），扛住单次瞬时失败，再换下一个供应商
+          for (let attempt = 1; attempt <= 2 && !out; attempt++) {
+            try {
+              out = await callProvider(provider, model, job);
+            } catch (e) {
+              lastError = e instanceof Error ? e : new Error(String(e));
+              if (attempt < 2) await new Promise((r) => setTimeout(r, 2000));
+            }
           }
+          if (out) break;
         }
         if (!out) {
           throw new Error(

@@ -12,6 +12,7 @@ interface Template {
   description: string;
   mode: "generate" | "edit" | "both";
   size: string;
+  cover_url: string;
 }
 
 interface Job {
@@ -147,6 +148,22 @@ export default function ImageStudio() {
     }
   };
 
+  const [retryingId, setRetryingId] = useState<string | null>(null);
+  const retryJob = async (job: Job) => {
+    setRetryingId(job.id);
+    try {
+      const res = await fetch(`/api/image/jobs/${job.id}/retry`, { method: "POST" });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error || "重新生成失败");
+      toast.success("已重新开始生成，完成后会出现在作品里");
+      await loadJobs();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "重新生成失败");
+    } finally {
+      setRetryingId(null);
+    }
+  };
+
   const removeJob = async (job: Job) => {
     const res = await fetch(`/api/image/jobs/${job.id}`, { method: "DELETE" });
     if (!res.ok) return toast.error("删除失败");
@@ -194,17 +211,23 @@ export default function ImageStudio() {
               <button
                 key={t.id}
                 onClick={() => setSelectedId(t.id)}
-                className={`w-52 shrink-0 rounded-2xl border p-4 text-left transition ${
+                className={`w-52 shrink-0 overflow-hidden rounded-2xl border text-left transition ${
                   selectedId === t.id ? "border-[#7C3AED] bg-[#7C3AED]/[0.04] ring-1 ring-[#7C3AED]" : "border-slate-200 bg-white hover:border-slate-300"
                 }`}
               >
-                <p className="text-sm font-semibold text-slate-900">{t.name}</p>
-                <p className="mt-1 line-clamp-2 min-h-10 text-xs leading-5 text-slate-400">{t.description || "—"}</p>
-                <span className="mt-2.5 inline-block rounded-full bg-[#7C3AED]/10 px-2 py-0.5 text-[11px] font-medium text-[#7C3AED]">
-                  {t.mode === "generate" ? "文生图" : t.mode === "edit" ? "上传照片编辑" : "文生图 / 图生图"}
-                  {" · "}
-                  {t.size === "1024x1024" ? "方形" : t.size === "1024x1536" ? "竖版" : "横版"}
-                </span>
+                {t.cover_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={t.cover_url} alt={t.name} className="h-28 w-full object-cover" loading="lazy" />
+                ) : null}
+                <div className="p-4">
+                  <p className="text-sm font-semibold text-slate-900">{t.name}</p>
+                  <p className="mt-1 line-clamp-2 min-h-10 text-xs leading-5 text-slate-400">{t.description || "—"}</p>
+                  <span className="mt-2.5 inline-block rounded-full bg-[#7C3AED]/10 px-2 py-0.5 text-[11px] font-medium text-[#7C3AED]">
+                    {t.mode === "generate" ? "文生图" : t.mode === "edit" ? "上传照片编辑" : "文生图 / 图生图"}
+                    {" · "}
+                    {t.size === "1024x1024" ? "方形" : t.size === "1024x1536" ? "竖版" : "横版"}
+                  </span>
+                </div>
               </button>
             ))}
             {templates.length === 0 && (
@@ -370,6 +393,15 @@ export default function ImageStudio() {
                   {job.status === "succeeded" && (
                     <button onClick={() => download(job)} className="rounded-md px-2 py-1 text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-800">
                       下载
+                    </button>
+                  )}
+                  {job.status === "failed" && (
+                    <button
+                      onClick={() => retryJob(job)}
+                      disabled={retryingId === job.id}
+                      className="rounded-md px-2 py-1 text-xs font-medium text-[#7C3AED] hover:bg-[#7C3AED]/10 disabled:opacity-50"
+                    >
+                      {retryingId === job.id ? "提交中…" : "重新生成"}
                     </button>
                   )}
                   <button onClick={() => removeJob(job)} className="rounded-md px-2 py-1 text-xs text-slate-400 hover:bg-red-50 hover:text-red-500">
